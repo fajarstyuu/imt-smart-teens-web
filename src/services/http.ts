@@ -1,42 +1,35 @@
-export class ApiError extends Error { constructor(message: string, public status = 0) { super(message); } }
-const apiBase = import.meta.env.VITE_API_URL || 'http://127.0.0.1:4174/api';
-let volatile: Record<string, string> = {};
-let volatileAfterWriteFailure: Record<string, string> = {};
-const storageKey = (role: string) => `imt-smart-teens-token-${role}`;
-const legacyStorageKey = (role: string) => `rg-token-${role}`;
-export const token = {
-  get(role: string) {
-    try {
-      const current = localStorage.getItem(storageKey(role));
-      const legacy = localStorage.getItem(legacyStorageKey(role));
-      if (Object.prototype.hasOwnProperty.call(volatileAfterWriteFailure, role)) return volatileAfterWriteFailure[role];
-      if (current) return current;
-      if (!legacy) return '';
-      // Migrate an existing authenticated session once; keep it usable even when
-      // storage is read-only or full, and remove the old key only after the copy.
-      try { localStorage.setItem(storageKey(role), legacy); localStorage.removeItem(legacyStorageKey(role)); } catch { /* preserve the legacy value for the next read */ }
-      return legacy;
-    } catch { return volatile[role] || ''; }
-  },
-  set(role: string, value: string) {
-    volatile[role] = value;
-    try {
-      if (value) { localStorage.setItem(storageKey(role), value); localStorage.removeItem(legacyStorageKey(role)); }
-      else { localStorage.removeItem(storageKey(role)); localStorage.removeItem(legacyStorageKey(role)); }
-      delete volatileAfterWriteFailure[role];
-    } catch {
-      volatileAfterWriteFailure[role] = value;
-      /* Keep this session in memory when persistence is unavailable. */
-    }
-  }
-};
-export async function request<T>(path: string, method = 'GET', body?: unknown, role = 'student'): Promise<T> {
-  const controller = new AbortController(); const timeout = setTimeout(() => controller.abort(), 12000);
-  try {
-    const response = await fetch(`${apiBase}${path}`, {method, headers: {'Content-Type':'application/json', ...(token.get(role) ? {Authorization:`Bearer ${token.get(role)}`} : {})}, body:body === undefined ? undefined : JSON.stringify(body), signal:controller.signal});
-    const data = await response.json();
-    if (!response.ok) throw new ApiError(data.error || 'Permintaan belum berhasil. Coba lagi.', response.status);
-    return data;
-  } catch (e) { if (e instanceof ApiError) throw e; throw new ApiError('Tidak dapat terhubung. Periksa koneksi dan coba lagi.'); }
-  finally { clearTimeout(timeout); }
+/** Rust-only cookie transport. Never retries mutations or refreshes CSRF implicitly. */
+export class ApiError extends Error {
+  constructor(message:string, public status=0, public code='NETWORK_UNCERTAIN', public details?:unknown, public requestId?:string) { super(message); }
 }
+export interface Page<T> { data:T[]; meta:{limit:number;offset:number;total:number} }
+export function createHttp(fetcher:typeof fetch=(...args)=>fetch(...args)) {
+  let csrfToken='';
+  const raw=async(path:string,method='GET',body?:unknown,key?:string,csrfOverride?:string):Promise<unknown>=>{
+    const headers=new Headers({Accept:'application/json'});
+    if(body!==undefined)headers.set('Content-Type','application/json');
+    if(method!=='GET')headers.set('X-CSRF-Token',csrfOverride??csrfToken);
+    if(key)headers.set('Idempotency-Key',key);
+    try {
+      const response=await fetcher(`/api/v1${path}`,{method,headers,credentials:'include',body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(12000)});
+      if(response.status===204)return undefined;
+      const envelope=await response.json();
+      if(!response.ok)throw new ApiError(envelope.error?.message||'Permintaan gagal.',response.status,envelope.error?.code||'HTTP_ERROR',envelope.error?.details,envelope.request_id);
+      if(!Object.hasOwn(envelope,'data'))throw new ApiError('Respons layanan tidak sesuai kontrak.',502,'INVALID_ENVELOPE');
+      return envelope;
+    } catch(error) {
+      if(error instanceof ApiError)throw error;
+      throw new ApiError('Koneksi terputus. Hasil operasi belum dapat dipastikan. Gunakan Coba lagi untuk operasi yang sama.');
+    }
+  };
+  return {
+    async get<T>(path:string):Promise<T>{return (await raw(path) as {data:T}).data;},
+    async page<T>(path:string):Promise<Page<T>>{return await raw(path) as Page<T>;},
+    async send<T>(path:string,method:string,body?:unknown,key?:string,csrfOverride?:string):Promise<T>{const result=await raw(path,method,body,key,csrfOverride);return result===undefined?undefined as T:(result as {data:T}).data;},
+    async csrf(){csrfToken=(await raw('/csrf') as {data:{token:string}}).data.token;return csrfToken;},
+    token:()=>csrfToken,
+    rotate:(token:string)=>{csrfToken=token;}
+  };
+}
+export const http=createHttp();
+export const query=(values:Record<string,string|number|undefined>)=>{const params=new URLSearchParams();Object.entries(values).forEach(([k,v])=>{if(v!==undefined&&v!=='')params.set(k,String(v));});return params.size?`?${params}`:'';};
