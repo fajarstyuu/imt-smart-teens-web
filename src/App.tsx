@@ -13,7 +13,7 @@ import { SummaryPage } from './pages/SummaryPage';
 import { TeacherResultsPage } from './pages/TeacherResultsPage';
 import { TeacherLessonsPage, TeacherQuestionsPage } from './pages/TeacherContentPages';
 import { Brand, Button, ErrorState, LoadingState } from './components/ui';
-import { currentStage, lessonUnlocked, stageUnlocked } from './domain/learning';
+import { currentStage, lessonUnlocked, stageUnlocked, stageComplete } from './domain/learning';
 import type { StageId } from './domain/types';
 
 /** Renders a prerequisite message without mounting the protected page content. */
@@ -40,7 +40,7 @@ function StudentRoute({ page }: { page: StudentPage }) {
   const student = data.student;
 
   if (!student) return <LoginPage navigate={navigate}/>;
-  if (!student.attempts.pre?.submittedAt) {
+  if (!stageComplete(student,'pre')) {
     if (page === 'home' || page === 'pre') return <AssessmentPage key="pre" type="pre" navigate={navigate}/>;
     return <StudentShell path={path} navigate={navigate}><LockedView navigate={navigate}/></StudentShell>;
   }
