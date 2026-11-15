@@ -54,7 +54,7 @@ function StudentRoute({ page }: { page: StudentPage }) {
         : page === 'post' ? 'post' : null;
   const locked = (stage !== null && !stageUnlocked(student, stage))
     || (page === 'lesson' && !!lessonId && !lessonUnlocked(student, lessonId))
-    || (page === 'summary' && !student.attempts.post?.submittedAt);
+    || (page === 'summary' && !stageComplete(student,'post'));
 
   if (locked) return <StudentShell path={path} navigate={navigate}><LockedView navigate={navigate}/></StudentShell>;
 

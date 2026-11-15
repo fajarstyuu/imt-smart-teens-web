@@ -16,7 +16,7 @@ async function compose(profile?:Profile):Promise<Student>{
  const me=profile??await http.get<Profile>('/student/me');
  const p=await http.get<Progress>('/student/progress');
  const attempts:Student['attempts']={};
- for(const type of ['pre','quiz','post'] as const){const id=p.active_attempt_ids[kind[type]];if(id)attempts[type]=attemptModel(await http.get<AttemptDto>(`/student/attempts/${id}`),type);}
+ for(const type of ['pre','quiz','post'] as const){const id=p.active_attempt_ids[kind[type]]??(current?.enrollmentId===me.enrollment.id?current.attempts[type]?.id:undefined);if(id)attempts[type]=attemptModel(await http.get<AttemptDto>(`/student/attempts/${id}`),type);}
  const measurements=p.latest_measurement_id?(await http.page<MeasurementDto>('/student/measurements?limit=25&offset=0')).data:[];
  const next=studentModel(me,p,attempts,measurements);
  // Keep already fetched permitted lesson bodies only within the same pinned enrollment.
@@ -52,7 +52,7 @@ export const api:AppServices={
   async loadLesson(id){const detail=await http.get<LessonBody>(`/student/lessons/${id}`);const s=need();s.lessons=s.lessons.map(l=>l.id===id?{...l,description:detail.description,sections:detail.sections,visited:detail.visited_section_ids}:l);return {...s};},
   async visitLesson(id,sectionId){const result=await http.send<{visited_section_ids:string[];opened_at:string}>(`/student/lessons/${id}/opened`,'POST',sectionId?{section_id:sectionId}:{});const s=need();s.lessons=s.lessons.map(l=>l.id===id?{...l,visited:result.visited_section_ids,openedAt:result.opened_at}:l);return {...s};},
   async completeLesson(id){await http.send(`/student/lessons/${id}/completion`,'POST',{});return compose();},
-  async recordMeasurement(weight,height){const s=need(),payload={weight_kg:weight,height_cm:height};await operations.run(`${s.enrollmentId}:measurement`,payload,key=>http.send('/student/measurements','POST',payload,key));return compose();},
+  async recordMeasurement(weight,height){const s=need(),payload={weight_kg:weight,height_cm:height};return operations.run(`${s.enrollmentId}:measurement`,payload,async key=>{await http.send('/student/measurements','POST',payload,key);return compose();});},
   schools:(q,offset=0)=>http.page('/schools'+query({q,limit:25,offset})),
   pendingEnrollment:()=>enrollment.pending(),enrollmentBlocked:()=>enrollment.isBlocked()
  },

@@ -2,10 +2,10 @@ import { useRef, useState } from 'react';
 import { Calculator, Check, Ruler, Scale } from 'lucide-react';
 import { useApp } from '../hooks/useApp';
 import { Button, Field, ErrorState, ErrorSummary, useAction } from '../components/ui';
-import { formatNumber } from '../domain/learning';
+import { formatNumber, stageComplete } from '../domain/learning';
 const parse=(v:string)=>{const text=v.trim().replace(',','.');return /^\d+(\.\d+)?$/.test(text)?Number(text):NaN;};
 export function CalculatorPage({navigate}:{navigate:(p:string)=>void}) {
-  const {data,services,setStudent}=useApp();const s=data.student!,m=s.measurement;const action=useAction();const formRef=useRef<HTMLFormElement>(null);const [weight,setWeight]=useState(m?String(m.weight):''),[height,setHeight]=useState(m?String(m.height):'');const [errors,setErrors]=useState<Record<string,string>>({});const final=!!s.attempts.post?.submittedAt;const dirty=!m||parse(weight)!==m.weight||parse(height)!==m.height;
+  const {data,services,setStudent}=useApp();const s=data.student!,m=s.measurement;const action=useAction();const formRef=useRef<HTMLFormElement>(null);const [weight,setWeight]=useState(m?String(m.weight):''),[height,setHeight]=useState(m?String(m.height):'');const [errors,setErrors]=useState<Record<string,string>>({});const final=stageComplete(s,'post');const dirty=!m||parse(weight)!==m.weight||parse(height)!==m.height;
   const calculate=()=>{
     // Read the submitted controls at the action boundary so a blur validation
     // update cannot make a valid, just-edited value stale for this save.
