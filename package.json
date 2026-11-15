@@ -7,9 +7,10 @@
     "dev": "node --env-file-if-exists=.env scripts/dev.mjs",
     "build": "tsc --noEmit && vite build && node scripts/publish.mjs",
     "start": "node --env-file-if-exists=.env scripts/start.mjs",
-    "test": "node --test tests/domain.test.mjs && vitest run",
+    "test": "npm run test:legacy-domain && vitest run",
+    "test:legacy-domain": "node --test tests/domain.test.mjs",
     "test:e2e": "playwright test",
-    "test:api": "playwright test tests/api.spec.ts"
+    "test:api": "playwright test tests/rust.spec.ts"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",

@@ -42,7 +42,7 @@ export const api:AppServices={
    });return compose();
   },
   async signOut(){await http.send('/student/sessions/current','DELETE');current=null;},
-  refresh:()=>compose(),
+  async refresh(){const restored=await compose();enrollment.recovered();await http.csrf();return restored;},
   async attempt(type){const s=need();let id=s.serverProgress.active_attempt_ids[kind[type]];
    if(!id){const payload={assessment_type:kind[type]};const created=await operations.run(`${s.enrollmentId}:attempt:${type}`,payload,key=>http.send<{attempt_id:string}>('/student/attempts','POST',payload,key));id=created.attempt_id;}
    const a=attemptModel(await http.get<AttemptDto>(`/student/attempts/${id}`),type);s.attempts[type]=a;return a;

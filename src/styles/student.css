@@ -15,3 +15,6 @@
 .form-kicker,.login-footer,.prerequisite,.form-footnote,.sidebar-label,.sidebar-help p,.sidebar-help button,.sidebar-footnote,.student-header .eyebrow,.header-progress small,.stepper small,.page-eyebrow>.muted,.measurement-photo figcaption,.next-stages .eyebrow,.lesson-list .section-heading .eyebrow,.lesson-row small,.lesson-lock-reason,.student-footer{font-size:var(--text-xs)}
 @media(max-width:767px){.student-header .eyebrow,.header-progress,.header-progress small,.stepper-compact>span:last-child,.summary-stats .od-stat>span:last-child,.login-footer{font-size:var(--text-xs)}}
 .student-header>.od-field{min-width:0;flex:1}.student-name,.student-header .muted,.lesson-row strong,.reading-outline button>span{overflow-wrap:anywhere}
+
+/* The longer admin label must wrap below branding rather than overflow a narrow login header. */
+.login-header{flex-wrap:wrap}.login-switch{margin-left:auto;min-height:44px}

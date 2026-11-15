@@ -1,106 +1,76 @@
 # Imt Smart Teens
 
-Imt Smart Teens is a React + TypeScript learning application implemented according to `frontend.md`. The interface is in Indonesian and uses the specified Editorial Campus palette, Georgia headings, Arial controls, small radii, thin dividers, and realistic measurement photography.
+React + TypeScript frontend for the reviewed Rust v1 API. The Indonesian UI preserves the existing Editorial Campus palette, typography, photography, clean BrowserRouter URLs and legacy hash redirects. Student views use public pinned content only; admin editors and scoped historical reports are separate views.
 
-## Run
+## Run against Rust
 
-Requires Node.js 22.12+ and npm.
+Use the lockfile with Node22.12+ (this integration was exercised with Node26):
 
 ```sh
-npm install
+npm ci
+# Start the reviewed Rust/PostgreSQL service separately on loopback4180.
+# See its docs/runtime-contract.md for operator-owned settings/migration/provisioning.
+npm run dev
+```
+
+Open `http://127.0.0.1:5173/`. Vite rewrites HTML navigation to the editable `app.html` source entry and proxies `/api/v1` to Rust4180. The dev script checks Rust readiness directly before starting Vite. It never starts or falls back to `server/development.mjs`.
+
+For a built local SPA:
+
+```sh
 npm run build
 npm start
 ```
 
-Open **http://127.0.0.1:4174**. The built, editable-source-backed website entry is **index.html**. Opening it in Open Design also requires the local data service (`npm start`). The service binds only to the loopback interface and serves the app entry for direct clean browser routes while keeping `/api/*` and `/assets/*` separate.
+The build type-checks, emits `dist/app.html`, and publishes the SPA entry as `index.html` with generated `assets/app-*` files. `npm start` serves that build through loopback Vite preview5173 and the same Rust proxy. Both services remain separate processes. Stop only processes you started.
 
-Production hosts must be configured to serve `index.html` for extensionless application routes such as `/materi/materi-1` and `/guru/hasil`, while continuing to serve real assets and API requests normally. The application uses BrowserRouter and cannot rely on hash URLs for host fallback.
+`RUST_API_ORIGIN` changes the **Node-side** dev/preview proxy target; default `http://127.0.0.1:4180`. Do not put credentials or database URLs in `VITE_*` variables. The browser always uses same-origin `/api/v1`. Production hosting must serve `index.html` for extensionless frontend routes, proxy the real API separately, use secure HttpOnly cookies and an explicitly allowlisted frontend Origin. Host/nginx/deployment configuration is not changed here.
 
-For source development:
+## Sessions, retries and persistence
 
-```sh
-npm run dev
-```
+- Student identity requires an active school UUID selected from a searchable, paginated catalog. The date input stays `YYYY-MM-DD`; it is not converted to a timestamp.
+- Rust issues separate opaque student/admin HttpOnly cookies. There are no browser bearer tokens, seeded account hints, name-based recovery or retained legacy teacher roles. `/guru/*` routes redirect to the admin area; historical fixture tokens cannot authenticate to Rust.
+- CSRF is fetched explicitly and held only in memory. Login/enrollment rotations replace the token. Reload restores each role independently with its GET endpoint. Target-role logout does not clear the other role.
+- One random key and validated payload are retained for an enrollment action. A sessionStorage uncertainty journal contains only its form/key, **never CSRF or credentials**. A current-context retry retains the original CSRF as well. A reloaded unauthenticated journal is blocked: a fresh CSRF GET cannot prove the HttpOnly enrollment context survived. Only authenticated `student/me` recovery clears the uncertainty and permits safe CSRF rebinding. There is no "start again" button that risks a duplicate identity.
+- Authenticated attempt/submission/measurement operations retain scoped keys across uncertain retries and reload. Changed payloads are rejected while the old operation is uncertain. These journals are retry metadata, not authoritative progress or grading records.
+- Answer saves use snapshot-question IDs and actual answer revisions (initial0). Empty arrays clear answers. Revision409 preserves local input, adopts only the returned committed revision and requires deliberate retry. Student keys/correctness are never downloaded.
+- Progress, stage locks, scores, immutable content, BMI display and measurements are server results. Zero and null are distinct. Required section visits and lesson completion are distinct writes. The frontend does not calculate persisted scores, progress policy or BMI.
+- `progress.active_attempt_ids` contains only in-progress attempts. Known submitted IDs are retained only within the same in-memory enrollment. Reopening a completed assessment/summary discovers its existing attempt through the documented idempotent create-or-return endpoint, then reads the public snapshot; it never treats missing active IDs as an unstarted stage.
 
-Open **http://127.0.0.1:5173/app.html**. `app.html` is the Vite source entry; `npm run build` generates `index.html` and its relative local assets. Do not hand-edit the generated bundle. Edit `src/`, then rebuild.
+## Admin content, schools and reports
 
-## Included areas
+- No public default admin account exists. An operator provisions an admin privately in Rust and separately assigns school reporting grants. Content and school-catalog permissions do not imply access to student reports.
+- Bounded lists and selected detail screens cover lessons, the paired pre/post and quiz banks, schools, enrollment summaries and historical answers. Editors use stable draft section/option UUIDs and expected root revisions. Draft save, lesson/bank publication and path publication are distinct actions. Path order is explicit, archives confirm and preserve history, and revision conflicts retain entered values.
+- Published option IDs differ from draft option IDs. Student snapshots remain pinned across subsequent CMS edits/publications/archive. Editorial content is plain text rendered with escaped React text nodes, never HTML injection.
+- Reports query authorized summaries first, selected enrollment results next, and bounded answer pages only on demand. Filters use school UUID, date-only form ranges, stage, assessment type and UTC RFC3339 submission bounds. School labels on historical results are enrollment snapshots.
+- Per-question reports require a selected immutable `question_version_id`, not a root ID or editor revision. Version selection persists independently of latest draft/history refresh. Pending, cleared, unstarted, correct and incorrect answers remain distinguishable.
 
-- Student identity form, pre-test, guarded learning dashboard, sequential lessons, quiz, IMT calculator, post-test, and final summary.
-- Autosaved question responses with stable question/option/version/attempt identifiers, save feedback and retry; unanswered-answer checks and confirmed final submission.
-- Separate lesson-opening and completion events, required section traversal, completed-lesson revisits, and server-side prerequisite checks in the development service.
-- A shared pre/post snapshot per student; CMS edits do not change an existing student's questions, option IDs, grading rules, or lesson order.
-- Teacher login, school/date/progress/assessment filters, results pagination, full answers by student and by question, lesson activity and IMT records.
-- Lesson creation/editing/preview/reordering, text sections, question creation/editing, single/multiple choice, correct answer validation, draft/publication state, and confirmed archiving. History is retained.
-
-## Development data and teacher account
-
-**No existing backend was supplied.** `server/` is an isolated local development API, not the production backend. The UI identifies it as a development environment with example data. Do not enter real student data into this demonstration deployment.
-
-The sample teacher login is:
-
-- Email: `guru@ruanggizi.local` (preserved seeded teacher login)
-- Password: `BelajarGizi2026!`
-
-These intentionally documented demonstration credentials live only in the server development fixture, not in the browser bundle. Override them using `TEACHER_EMAIL` and `TEACHER_PASSWORD` in the server environment. Teacher sessions are separate from student sessions; both use server-issued random tokens. The development API checks roles and prerequisites and never returns teacher datasets or unreleased answer keys to student requests.
-
-Development records persist in `.data/development.json`, including attempts, answers, lesson versions, section visits, timestamps, results, and an event log. The browser stores **only session tokens** with a memory fallback; it does not store answer keys, grades, progress, or student result datasets as the source of truth. Storage restrictions can prevent session recovery across page reloads. The development token lifetime is seven days.
-
-Use a separate `RG_DATA_DIR` for an isolated dataset. To start over, stop the service and remove only its generated `.data/development.json`; it will be reseeded next time. Tests use a separate temporary directory and never alter the normal demonstration dataset.
-
-## Architecture and SOLID
-
-```text
-src/
-  components/       Shared controls, navigation, tables, question and editor views
-  pages/            Student and teacher application areas
-  hooks/            App context, assessment saving, navigation, data loading
-  domain/           Typed models and learning progression rules
-  services/         Student/teacher repository contracts and HTTP implementation
-  styles/           Central tokens, global rules, student and teacher layouts
-server/
-  fixtures.mjs      Development content and example student records (server only)
-  domain.mjs        Server validation, guards, calculation, grading, redaction
-  development.mjs   Local API and built-site server
-```
-
-- **Single responsibility:** rendering, assessment behavior, transport, and domain decisions have separate modules. Application content and example identities are data, not embedded in JSX.
-- **Open/closed:** shared controls are extended by composition and props; a new backend can implement the existing service contracts.
-- **Liskov substitution:** service implementations must return the same typed models and preserve repository behavior.
-- **Interface segregation:** student and teacher repository contracts are distinct; views consume the appropriate interface.
-- **Dependency inversion:** `AppProvider` receives `AppServices`; UI hooks depend on that contract rather than calling `fetch` directly.
-
-The local API verifies IMT independently of the frontend, keeps full calculation precision, and stores measurements before unlocking the post-test. The UI displays one decimal and deliberately does not assign adult BMI categories or health interpretations.
-
-## Production integration still required
-
-Set `VITE_API_URL` to your API base URL and rebuild. `src/services/contracts.ts` declares the frontend requirements; `src/services/api.ts` and `server/development.mjs` document the current endpoint contract. Replace the adapter when your backend uses different routes or models.
-
-Production release still requires your actual identity/access system, secure session handling, server-controlled content/versioning, persistent database and migrations, audit/retention/privacy requirements, rate limiting, and production deployment. The supplied local service and sample account do not establish production authentication or data-protection readiness. There is no fabricated connection to a school system.
-
-The local editor supports plain-text content blocks and single/multiple-choice questions. Rich media, external authoring tools, other question types, and backend-specific attempt policies require the corresponding real API capabilities. Lesson content is rendered as text, not untrusted HTML.
-
-## Assets and reference
-
-The referenced concept image `01-editorial-campus-v2-timbangan.png` was not supplied. Styling follows the written specification. The local replacement photograph depicts a glass digital weighing scale and **blue** measuring tape rather than the reference's yellow tape; the photo was not recolored or generated. There is no food photography.
-
-Photography, source, author, and license are retained in `public/assets/stock/credits.json` and the built `assets/stock/credits.json`. The [Pexels License](https://www.pexels.com/license/) permits website use without visible attribution. The unavailable original book/leaf logo is represented with the consistent outline icon family.
-
-## Checks
+## Tests and real browser proof
 
 ```sh
 npm test
-npm run test:api
+npm run build
 npx playwright install chromium
+# Paths below are operator-supplied PRIVATE files, not files in this repo:
+E2E_PRIVATE_ENV=/path/to/private/synthetic-runtime.env \
+E2E_GRANT_HELPER=/path/to/operator/synthetic-school-grant.py \
 npm run test:e2e
 ```
 
-The test suite covers numeric edge cases, learning guards, grading, response redaction, question snapshots, server role checks, answer retries, question completion, reload recovery, the complete student sequence, teacher editors/results, and horizontal overflow at 360, 768, 1024, and 1440 pixels. Browser tests start their own isolated development API on port 4175.
+`E2E_PRIVATE_ENV` supplies generated `ADMIN_EMAIL` and `ADMIN_PASSWORD` to the **Node test worker only**. Login is injected with Playwright's Node request context, never browser environment/storage, URLs, committed files or screenshots. Traces/video/automatic screenshots are disabled to avoid authentication artifacts. Explicit screenshots show only post-authentication synthetic data or empty login forms.
 
-Implementation references: [React createRoot](https://react.dev/reference/react-dom/client/createRoot), [Vite build and relative base paths](https://vite.dev/guide/build.html).
+`E2E_GRANT_HELPER` is an optional operator-owned Python helper required by the school-creation/reporting test. Its sole argument is the canonical UUID of the new synthetic school. A portable equivalent must be hard-bound to the owned synthetic DB and test admin, assign only that school's reporting grant, and verify the assignment. It must not create teaching data, answers, scores or progress; no public UI calls it. No absolute helper path or secret is committed here.
 
-### Results in this environment
+The browser suite uses the real already-running Rust API/PostgreSQL and one Chromium worker. It authors teaching content through the actual CMS UI, creates a synthetic school, enrolls/completes a student, republishes after enrollment to prove old snapshots, verifies reports against an explicitly selected historical version, exercises response loss/refresh/fail-closed enrollment, role coexistence/ownership/target logout, school scope denial, real revision conflicts and confirmed archive. It checks clean/hash routes, denied localStorage, reduced motion, keyboard forms/dialogs and360/768/1024/1440px layouts. Actual screenshots are written to ignored `test-results/evidence`.
 
-The production build/type check, six domain tests, four React DOM integration tests, and the API integration test passed. The DOM tests exercise real development API requests, including the full student sequence, saved-session recovery, save-error retry, route guards, and teacher authoring/results.
+The suite deliberately waits for the real per-IP300 requests/60s budget at startup and between the large CMS journey and remaining tests. Do not disable rate limiting, auto-retry uncertain writes, run concurrent browser fleets or point the suite at application/production data. Existing synthetic test data is inspected/reused; the suite never wipes the database.
 
-Real-browser tests were attempted but could not run: Chromium was blocked by the execution environment’s process permission boundary. The in-app browser was unavailable, and computer-use access to Brave was not approved. Therefore responsive rendering at the four requested widths, visual layout, real-browser focus trapping, and 200% zoom remain **unverified**, rather than reported as passing. The supplied Playwright tests are ready to run in an environment with browser access.
+On minimal Linux hosts, Chromium may need shared libraries. Without authorization to install host packages, download/extract dependencies to a private scratch directory and set `LD_LIBRARY_PATH` **only for the test command**. Do not use privileged OS installs. The Task4 report records exact execution evidence and any environment-specific paths; they are not portable setup requirements.
+
+`npm test` explicitly labels the six historical Node domain tests as `test:legacy-domain`; the active Vitest tests cover the Rust transport, operation journals, revisioned views and admin adapters. Historical fixture-backed browser/component tests are retained under `tests/legacy/*.fixture.*`, outside active test globs. Neither these legacy files nor `server/` are Rust integration evidence or a runtime fallback.
+
+## Source boundaries and assets
+
+`src/services/dto.ts` declares Rust wire DTOs; `http.ts` owns cookie/CSRF envelopes/errors; `api.ts` composes the current public student view; `admin.ts` declares exact CMS/report commands. Presentation models and route/status mapping live in `src/domain`; UI state is not persisted learning state. Existing tokens/components/styles and measurement photograph are retained.
+
+Photo provenance/license is in `public/assets/stock/credits.json` (copied into built assets). The supplied photograph uses a blue measuring tape; it was not recolored. Production rollout, infrastructure/TLS/privacy acceptance and independent whole-app review remain separate owner gates.
