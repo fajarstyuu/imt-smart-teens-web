@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 2,
+  "fileName": "index.html",
+  "currentVersionId": "804b4d88-5522-454e-9057-847b1f431efc",
+  "entries": [
+    {
+      "id": "804b4d88-5522-454e-9057-847b1f431efc",
+      "fileName": "index.html",
+      "version": 1,
+      "label": "Version 1",
+      "createdAt": 1794401634810,
+      "source": "ai",
+      "prompt": "[form answers — frontend-brief]\n- Upload docs/frontend.md: frontend.md\n\n[uploaded design files]\n- Uploaded file 1: frontend.md -> frontend.md (for: Upload docs/frontend.md)",
+      "size": 693,
+      "mime": "text/html; charset=utf-8",
+      "kind": "html",
+      "contentPath": "0001-804b4d88-5522-454e-9057-847b1f431efc.html",
+      "contentDigest": "7bb2c77e1abdc7e22fc0afec362dbc2002c1ae52489631c707c39325a6a770fd",
+      "promptSource": "message"
+    }
+  ]
+}

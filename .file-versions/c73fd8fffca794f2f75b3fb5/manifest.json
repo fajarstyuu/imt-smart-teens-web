@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 2,
+  "fileName": "app.html",
+  "currentVersionId": "7a398152-c397-4956-b0bb-a700c995332c",
+  "entries": [
+    {
+      "id": "7a398152-c397-4956-b0bb-a700c995332c",
+      "fileName": "app.html",
+      "version": 1,
+      "label": "Version 1",
+      "createdAt": 1794401634811,
+      "source": "ai",
+      "prompt": "[form answers — frontend-brief]\n- Upload docs/frontend.md: frontend.md\n\n[uploaded design files]\n- Uploaded file 1: frontend.md -> frontend.md (for: Upload docs/frontend.md)",
+      "size": 596,
+      "mime": "text/html; charset=utf-8",
+      "kind": "html",
+      "contentPath": "0001-7a398152-c397-4956-b0bb-a700c995332c.html",
+      "contentDigest": "2622ef335e388bb195690d7c6582de7b4815c6cf2bdb512079a572a3cf52a3fb",
+      "promptSource": "message"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+import { createRoot } from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
+import App from './App';
+import { AppProvider } from './hooks/useApp';
+import { api } from './services/api';
+import './styles/layout.css';
+import './styles/tokens.css';
+import './styles/global.css';
+import './styles/student.css';
+import './styles/teacher.css';
+createRoot(document.getElementById('root')!).render(<BrowserRouter><AppProvider services={api}><App/></AppProvider></BrowserRouter>);

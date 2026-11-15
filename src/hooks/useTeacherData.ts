@@ -1,0 +1,2 @@
+import { useEffect, useState } from 'react';
+export function useTeacherData<T>(load:()=>Promise<T>) {const [data,setData]=useState<T|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState('');const reload=async()=>{setError('');setLoading(true);try{setData(await load());}catch(e){setError((e as Error).message);}finally{setLoading(false);}};useEffect(()=>{void reload();},[]);return {data,loading,error,reload};}

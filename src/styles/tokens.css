@@ -1,0 +1,12 @@
+:root {
+  --color-primary:#0c3e28;--color-primary-hover:#174e35;--color-primary-active:#082f1e;--color-primary-soft:#e4ebdd;
+  --color-secondary:#f6bc20;--color-secondary-hover:#e8ac12;--color-secondary-active:#d79a08;--color-secondary-soft:#fff0c8;
+  --color-canvas:#f7f3ec;--color-surface:#fcfaf6;--color-surface-muted:#eceae1;
+  --color-text:#123225;--color-text-muted:#686d60;--color-text-inverse:#fff;--color-border:#d5d1c5;--color-border-strong:#82867b;
+  --color-success:#456f36;--color-success-soft:#e4ebdd;--color-warning:#7a570e;--color-warning-soft:#fff0c8;--color-danger:#a3372d;--color-danger-soft:#fbeae5;
+  --font-editorial:Georgia,'Times New Roman',serif;--font-ui:Arial,Helvetica,sans-serif;
+  --text-xs:.75rem;--text-small:.875rem;--text-body:1rem;--text-reading:1.125rem;--text-h3:1.5rem;--text-h2:2rem;--text-h1:clamp(2rem,3.8vw,3.5rem);--text-page:clamp(2rem,3.2vw,2.5rem);
+  --space-1:4px;--space-2:8px;--space-3:12px;--space-4:16px;--space-5:20px;--space-6:24px;--space-8:32px;--space-10:40px;--space-12:48px;--space-16:64px;
+  --radius-control:4px;--radius-panel:6px;--shadow-panel:0 2px 6px rgb(18 50 37 / 5%);
+  --sidebar-width:216px;--content-max:1440px;--duration-fast:140ms;--duration-normal:200ms;--control-height:48px;--icon-size:20px;--line:1px solid var(--color-border);--page-padding:32px;
+}

@@ -1,0 +1,8 @@
+import { Check, LockKeyhole } from 'lucide-react';
+import { currentStage, stageComplete, stageUnlocked, stages } from '../domain/learning';
+import type { Student } from '../domain/types';
+import { useState } from 'react';
+export function LearningStepper({student,navigate}:{student:Student;navigate:(p:string)=>void}) {
+  const current=currentStage(student);const [expanded,setExpanded]=useState(false);
+  return <section className="stepper-region" aria-label="Tahapan pembelajaran"><button className="stepper-compact" type="button" aria-expanded={expanded} onClick={()=>setExpanded(!expanded)}><span>Tahap {stages.findIndex(s=>s.id===current.id)+1} dari {stages.length} · <strong>{current.label}</strong></span><span>{expanded?'Tutup urutan':'Lihat urutan'}</span></button><ol className={`stepper ${expanded?'stepper--expanded':''}`}>{stages.map((stage,i)=>{const complete=stageComplete(student,stage.id),unlocked=stageUnlocked(student,stage.id);return <li key={stage.id} className={complete?'step--complete':unlocked?'step--current':'step--locked'}><button type="button" onClick={()=>navigate(stage.path)} disabled={!unlocked} aria-current={!complete&&stage.id===current.id?'step':undefined}><span className="step-number">{complete?<Check className="od-icon" aria-hidden="true"/>:!unlocked?<LockKeyhole className="od-icon" aria-hidden="true"/>:i+1}</span><span className="od-field"><strong>{stage.label}</strong><small>{complete?'Selesai':unlocked?'Sedang dikerjakan':'Terkunci'}</small></span></button>{!unlocked && <span className="sr-only">Selesaikan {stages[i-1]?.label} terlebih dahulu.</span>}</li>;})}</ol></section>;
+}
