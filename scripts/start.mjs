@@ -1,5 +1,5 @@
-let running=false;
-const port=process.env.PORT||'4174';
-try {const response=await fetch(`http://127.0.0.1:${port}/api/bootstrap`,{signal:AbortSignal.timeout(1000)});const body=await response.json();running=response.ok&&body.config?.brand==='Imt Smart Teens';}catch{}
-if(running)console.log(`Imt Smart Teens is already running at http://127.0.0.1:${port}`);
-else await import('../server/development.mjs');
+/** Serve the built SPA through Vite preview with the same Rust-only API proxy. */
+import {spawn} from 'node:child_process';
+const origin=process.env.RUST_API_ORIGIN||'http://127.0.0.1:4180';
+try{const response=await fetch(`${origin}/health/ready`,{signal:AbortSignal.timeout(3000)});if(!response.ok)throw Error();}catch{console.error('Rust API is not ready; no legacy fallback.');process.exit(1);}
+const child=spawn(process.execPath,['node_modules/vite/bin/vite.js','preview'],{stdio:'inherit'});for(const signal of ['SIGINT','SIGTERM'])process.on(signal,()=>child.kill(signal));child.on('exit',code=>process.exit(code??1));

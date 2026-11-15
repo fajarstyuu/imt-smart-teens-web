@@ -10,6 +10,7 @@ import { AssessmentPage } from './pages/AssessmentPage';
 import { LearningHome, LessonDetail } from './pages/LearningPages';
 import { CalculatorPage } from './pages/CalculatorPage';
 import { SummaryPage } from './pages/SummaryPage';
+import { AdminSchoolsPage } from './pages/AdminSchoolsPage';
 import { TeacherResultsPage } from './pages/TeacherResultsPage';
 import { TeacherLessonsPage, TeacherQuestionsPage } from './pages/TeacherContentPages';
 import { Brand, Button, ErrorState, LoadingState } from './components/ui';
@@ -29,6 +30,8 @@ function LegacyHashRedirect() {
   if (hash.startsWith('#/')) return <Navigate to={`${hash.slice(1)}${window.location.search}`} replace/>;
   return null;
 }
+
+function LegacyAdminRedirect(){const location=useLocation();const suffix=location.pathname.slice('/guru'.length);const target=suffix.startsWith('/soal/')?'/admin/soal':`/admin${suffix||'/hasil'}`;return <Navigate replace to={`${target}${location.search}`}/>;}
 
 type StudentPage = 'home' | 'pre' | 'lesson-list' | 'lesson' | 'quiz' | 'calculator' | 'post' | 'summary';
 
@@ -65,7 +68,7 @@ function StudentRoute({ page }: { page: StudentPage }) {
   return <StudentShell path={['home', 'lesson-list'].includes(page) ? '/beranda' : path} navigate={navigate}>{content}</StudentShell>;
 }
 
-type TeacherPage = 'results' | 'student' | 'lessons' | 'lesson-editor' | 'questions' | 'question-editor';
+type TeacherPage = 'results' | 'student' | 'lessons' | 'lesson-editor' | 'questions' | 'question-editor' | 'schools';
 
 /** Requires a teacher session before any CMS or student-result view can mount. */
 function TeacherRoute({ page }: { page: TeacherPage }) {
@@ -74,7 +77,7 @@ function TeacherRoute({ page }: { page: TeacherPage }) {
   const params = useParams();
   if (!data.teacher) return <LoginPage navigate={navigate} teacher returnTo={path}/>;
 
-  const content = page === 'lessons' || page === 'lesson-editor'
+  const content = page === 'schools' ? <AdminSchoolsPage/> : page === 'lessons' || page === 'lesson-editor'
     ? <TeacherLessonsPage editId={page === 'lesson-editor' ? params.editId : undefined} navigate={navigate}/>
     : page === 'questions' || page === 'question-editor'
       ? <TeacherQuestionsPage editId={page === 'question-editor' ? params.editId : undefined} navigate={navigate}/>
@@ -95,7 +98,7 @@ export default function App() {
   const path = location.pathname;
 
   useEffect(() => {
-    document.title = `${path.startsWith('/guru') ? 'Ruang guru' : 'Pembelajaran siswa'} · ${data.config.brand}`;
+    document.title = `${path.startsWith('/admin') ? 'Ruang admin' : 'Pembelajaran siswa'} · ${data.config.brand}`;
     const frame = requestAnimationFrame(() => {
       const active = document.activeElement;
       if (active && ['INPUT', 'TEXTAREA', 'SELECT'].includes(active.tagName)) return;
@@ -121,13 +124,15 @@ export default function App() {
       <Route path="/post-test" element={<StudentRoute page="post"/>}/>
       <Route path="/ringkasan" element={<StudentRoute page="summary"/>}/>
       <Route path="/app.html" element={<Navigate to="/" replace/>}/>
-      <Route path="/guru/masuk" element={<TeacherRoute page="results"/>}/>
-      <Route path="/guru/hasil" element={<TeacherRoute page="results"/>}/>
-      <Route path="/guru/hasil/:studentId" element={<TeacherRoute page="student"/>}/>
-      <Route path="/guru/materi" element={<TeacherRoute page="lessons"/>}/>
-      <Route path="/guru/materi/:editId" element={<TeacherRoute page="lesson-editor"/>}/>
-      <Route path="/guru/soal" element={<TeacherRoute page="questions"/>}/>
-      <Route path="/guru/soal/:editId" element={<TeacherRoute page="question-editor"/>}/>
+      <Route path="/admin/masuk" element={<TeacherRoute page="results"/>}/>
+      <Route path="/admin/hasil" element={<TeacherRoute page="results"/>}/>
+      <Route path="/admin/hasil/:studentId" element={<TeacherRoute page="student"/>}/>
+      <Route path="/admin/materi" element={<TeacherRoute page="lessons"/>}/>
+      <Route path="/admin/materi/:editId" element={<TeacherRoute page="lesson-editor"/>}/>
+      <Route path="/admin/soal" element={<TeacherRoute page="questions"/>}/>
+      <Route path="/admin/soal/:bankId/:editId" element={<TeacherRoute page="question-editor"/>}/>
+      <Route path="/admin/sekolah" element={<TeacherRoute page="schools"/>}/>
+      <Route path="/guru/*" element={<LegacyAdminRedirect/>}/>
       <Route path="*" element={<NotFound/>}/>
     </Routes>
   </>;

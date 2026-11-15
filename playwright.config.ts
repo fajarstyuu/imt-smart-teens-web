@@ -1,2 +1,2 @@
-import { defineConfig } from '@playwright/test';
-export default defineConfig({testDir:'./tests',testMatch:'**/*.spec.ts',fullyParallel:false,workers:1,timeout:90000,reporter:'list',use:{baseURL:'http://127.0.0.1:4175',headless:true,launchOptions:{executablePath:process.env.RG_CHROME_PATH||undefined}},webServer:{command:'node tests/start-server.mjs',url:'http://127.0.0.1:4175/api/bootstrap',reuseExistingServer:false,timeout:20000}});
+import {defineConfig} from '@playwright/test';
+export default defineConfig({testDir:'./tests',testMatch:'**/rust.spec.ts',fullyParallel:false,workers:1,timeout:180000,reporter:'list',use:{baseURL:'http://127.0.0.1:5173',headless:true,viewport:{width:1440,height:1000},trace:'off',screenshot:'off',video:'off',launchOptions:{executablePath:process.env.RG_CHROME_PATH||undefined}},webServer:{command:'npm run dev',url:'http://127.0.0.1:5173/app.html',reuseExistingServer:false,timeout:20000}});

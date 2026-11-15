@@ -8,6 +8,7 @@ export function AppProvider({services,children}:{services:AppServices;children:R
   const [data,setData] = useState(fallback); const [loading,setLoading]=useState(true); const [error,setError]=useState('');
   const reload = async () => {setError('');setLoading(true);try {setData(await services.bootstrap());}catch(e){setError((e as Error).message);}finally{setLoading(false);}};
   useEffect(() => {void reload();},[services]);
+  useEffect(()=>{const expired=(event:Event)=>{const role=(event as CustomEvent).detail;setData(d=>({...d,...(role==='admin'?{teacher:null}:{student:null})}));};window.addEventListener('imt-session-expired',expired);return()=>window.removeEventListener('imt-session-expired',expired);},[]);
   return <Context.Provider value={{services,data,loading,error,reload,setStudent:s=>setData(d=>({...d,student:s})),setTeacher:t=>setData(d=>({...d,teacher:t}))}}>{children}</Context.Provider>;
 }
 export function useApp() { const value=useContext(Context); if(!value) throw new Error('AppProvider required'); return value; }

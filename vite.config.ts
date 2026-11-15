@@ -1,2 +1,3 @@
-import { defineConfig } from 'vite';
-export default defineConfig({ base: '/', build: { rollupOptions: { input: 'app.html' } }, server: { host: '127.0.0.1', port: 5173, strictPort: true } });
+import {defineConfig} from 'vite';
+const proxy={'/api':{target:process.env.RUST_API_ORIGIN||'http://127.0.0.1:4180',changeOrigin:false},'/health':{target:process.env.RUST_API_ORIGIN||'http://127.0.0.1:4180'}};
+export default defineConfig({base:'/',plugins:[{name:'source-spa-entry',configureServer(server){server.middlewares.use((req,_res,next)=>{if(req.headers.accept?.includes('text/html')&&!req.url?.startsWith('/api/')&&!req.url?.startsWith('/health/')&&!/\.[a-z0-9]+(?:\?|$)/i.test(req.url??''))req.url='/app.html';next();});}}],build:{rollupOptions:{input:'app.html'}},server:{host:'127.0.0.1',port:5173,strictPort:true,proxy},preview:{host:'127.0.0.1',port:5173,strictPort:true,proxy}});

@@ -14,6 +14,7 @@ export function createHttp(fetcher:typeof fetch=(...args)=>fetch(...args)) {
       const response=await fetcher(`/api/v1${path}`,{method,headers,credentials:'include',body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(12000)});
       if(response.status===204)return undefined;
       const envelope=await response.json();
+      if(response.status===401&&typeof window!=='undefined')window.dispatchEvent(new CustomEvent('imt-session-expired',{detail:path.startsWith('/admin/')?'admin':'student'}));
       if(!response.ok)throw new ApiError(envelope.error?.message||'Permintaan gagal.',response.status,envelope.error?.code||'HTTP_ERROR',envelope.error?.details,envelope.request_id);
       if(!Object.hasOwn(envelope,'data'))throw new ApiError('Respons layanan tidak sesuai kontrak.',502,'INVALID_ENVELOPE');
       return envelope;
