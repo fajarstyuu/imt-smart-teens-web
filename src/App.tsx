@@ -70,7 +70,7 @@ function StudentRoute({ page }: { page: StudentPage }) {
 
 type TeacherPage = 'results' | 'student' | 'lessons' | 'lesson-editor' | 'questions' | 'question-editor' | 'schools';
 
-/** Requires a teacher session before any CMS or student-result view can mount. */
+/** Requires an admin session before any CMS or student-result view can mount. */
 function TeacherRoute({ page }: { page: TeacherPage }) {
   const { data } = useApp();
   const { navigate, path } = useNavigation();
@@ -85,7 +85,7 @@ function TeacherRoute({ page }: { page: TeacherPage }) {
   return <TeacherShell path={path} navigate={navigate}>{content}</TeacherShell>;
 }
 
-/** Shows a clear page-level 404 for URLs outside the declared student and teacher contracts. */
+/** Shows a clear page-level 404 for URLs outside the declared student and admin contracts. */
 function NotFound() {
   const { navigate } = useNavigation();
   return <main className="connection-page"><Brand/><h1>Halaman tidak ditemukan.</h1><p>Alamat yang kamu buka tidak tersedia.</p><Button onClick={() => navigate('/')}>Kembali ke beranda</Button></main>;

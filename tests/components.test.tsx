@@ -28,3 +28,9 @@ test('stale answer preserves unsaved input, reconciles latest answer revision, a
  await user.click(screen.getByRole('button',{name:'Coba lagi'}));await waitFor(()=>expect(saveAnswer).toHaveBeenNthCalledWith(2,'pre','snapshot-q',7,['choice']));
  await waitFor(()=>expect(screen.getByRole('status').textContent).toContain('Jawaban tersimpan'));await user.click(screen.getByRole('button',{name:'Kosongkan'}));await waitFor(()=>expect(saveAnswer).toHaveBeenNthCalledWith(3,'pre','snapshot-q',8,[]));
 });
+
+test('uncertain reloaded enrollment disables new submission and explains blocked context',async()=>{
+ const pending={name:'Siswa tertahan',school:'school-uuid',date:'2026-11-16'};
+ mount(<LoginPage navigate={()=>{}}/>,{...base,student:{...base.student,pendingEnrollment:()=>pending,enrollmentBlocked:()=>true}});
+ expect(screen.getByRole('button',{name:'Mulai pre-test',exact:true})).toHaveProperty('disabled',true);expect(screen.getByText(/Konteks pendaftaran tidak dapat dipastikan/)).toBeTruthy();
+});

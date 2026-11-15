@@ -51,7 +51,7 @@ test('real CMS publications, full student journey, scoped historical reporting a
  if(!process.env.E2E_GRANT_HELPER)throw Error('Operator must supply E2E_GRANT_HELPER to grant the new synthetic school to this admin.');
  execFileSync('python3',[process.env.E2E_GRANT_HELPER,school.id],{stdio:'pipe'});
  await page.reload();await page.getByLabel('Cari sekolah',{exact:true}).fill(schoolName);await expect(page.getByText(schoolName,{exact:true})).toBeVisible();
- await capture(page,'admin-schools-desktop.png');
+ await capture(page,'admin-schools-desktop.png');await page.setViewportSize({width:360,height:1000});await noOverflow(page);await capture(page,'admin-schools-360.png');await page.setViewportSize({width:1440,height:1000});
  // Author via browser CMS. On retries, inspect and reuse this test's already-authored drafts, never wipe data.
  for(let i=1;i<=2;i++){
   const title=`Materi sintetis integrasi ${i}`;const existing=(await data(admin,'/admin/lessons?limit=100&offset=0')).find((l:any)=>l.draft.title===title&&l.state!=='archived');
@@ -71,11 +71,11 @@ test('real CMS publications, full student journey, scoped historical reporting a
   await page.goto(`/admin/soal?bank=${bank.id}`);await click(page,'Terbitkan bank soal');await expect(page.getByRole('status').filter({hasText:'Bank soal diterbitkan'})).toBeVisible();
  }
  await page.goto('/admin/materi');await click(page,'Turunkan materi 1');await expect(page.getByRole('status').filter({hasText:'Urutan draf tersimpan'})).toBeVisible();await click(page,'Naikkan materi 2');await click(page,'Terbitkan jalur belajar');await expect(page.getByRole('status').filter({hasText:'Jalur belajar diterbitkan'})).toBeVisible();
- await capture(page,'admin-content-desktop.png');
+ await capture(page,'admin-content-desktop.png');await page.setViewportSize({width:360,height:1000});await noOverflow(page);await capture(page,'admin-content-360.png');await page.setViewportSize({width:1440,height:1000});
  const student=await browser.newContext({baseURL:origin,viewport:{width:1440,height:1000}});const pupil=await student.newPage();observe(pupil);
  await pupil.goto('/');await pupil.getByLabel('Nama lengkap',{exact:false}).fill(`Siswa sintetis ${suffix}`);await pupil.getByLabel('Cari sekolah aktif').fill(schoolName);await expect(pupil.getByRole('option',{name:schoolName,exact:true})).toBeAttached();await pupil.getByLabel('Asal sekolah',{exact:false}).selectOption(school.id);await pupil.getByLabel('Tanggal pengisian',{exact:false}).fill('2026-11-16');
  const enrolled=pupil.waitForResponse(r=>r.url().endsWith('/api/v1/student/sessions')&&r.request().method()==='POST');await click(pupil,'Mulai pre-test');const registration=await enrolled;expect(registration.status()).toBe(201);const profile=(await registration.json()).data;
- await expect(pupil.getByRole('heading',{name:'Pre-test',exact:true})).toBeVisible();expect(profile.enrollment.form_date).toBe('2026-11-16');
+ await expect(pupil.getByRole('heading',{name:'Pre-test',exact:true})).toBeVisible();expect(profile.enrollment.form_date).toBe('2026-11-16');for(const width of [360,768,1024,1440]){await pupil.setViewportSize({width,height:1000});await noOverflow(pupil);await capture(pupil,`student-pre-${width}.png`);}
  await pupil.locator('.answer-option input').first().check();await expect(pupil.locator('.save-status')).toContainText('Jawaban tersimpan');await pupil.reload();await expect(pupil.locator('.answer-option input').first()).toBeChecked();
  await pupil.goto('/materi/'+(await data(student,'/student/progress')).lessons[0].lesson_id);await expect(pupil.getByRole('heading',{name:'Satu langkah dulu.'})).toBeVisible();expect(await pupil.locator('.lesson-body').count()).toBe(0);
  await pupil.goto('/pre-test');await answer(pupil,'pre-test',true);expect(await pupil.locator('.score-display').count()).toBe(0);
@@ -86,13 +86,13 @@ test('real CMS publications, full student journey, scoped historical reporting a
  // Publish a genuinely new question/bank/path after enrollment. The existing cohort remains pinned.
  const historicalQuestion=historicalPre.questions[0];await page.goto(`/admin/soal/${banks[0].id}/${historicalQuestion.question_id}`);await page.getByLabel('Pertanyaan',{exact:true}).fill('Soal sintetis paired 1 draf berikutnya');await click(page,'Simpan draf');await page.goto(`/admin/soal?bank=${banks[0].id}`);await click(page,'Terbitkan bank soal');await expect(page.getByRole('status').filter({hasText:'Bank soal diterbitkan'})).toBeVisible();await page.goto('/admin/materi');await click(page,'Terbitkan jalur belajar');await expect(page.getByRole('status').filter({hasText:'Jalur belajar diterbitkan'})).toBeVisible();
 
- await click(pupil,'Mulai belajar');await click(pupil,'Buka materi');
+ await click(pupil,'Mulai belajar');await click(pupil,'Buka materi');await expect(pupil.locator('.lesson-body')).toBeVisible();await pupil.setViewportSize({width:360,height:1000});await noOverflow(pupil);await capture(pupil,'student-lesson-360.png');await pupil.setViewportSize({width:1440,height:1000});
  const lessons=(await data(student,'/student/progress')).lessons;
  for(let i=0;i<lessons.length;i++){
   await expect(pupil.locator('.lesson-body')).toBeVisible();const next=pupil.getByRole('button',{name:'Bagian berikutnya',exact:true});while(await next.count()&&await next.isVisible()){await expect(next).toBeEnabled();await next.click();}
   await expect(pupil.getByRole('button',{name:'Selesai & lanjut',exact:true})).toBeEnabled();await click(pupil,'Selesai & lanjut');
  }
- await answer(pupil,'quiz');await expect(pupil.locator('.score-display')).toContainText('0');await click(pupil,'Buka kalkulator IMT');await pupil.getByLabel('Berat badan (kg)',{exact:false}).fill('45,5');await pupil.getByLabel('Tinggi badan (cm)',{exact:false}).fill('155');await click(pupil,'Hitung IMT');await expect(pupil.locator('.bmi-number')).toContainText('18.9');await pupil.reload();await expect(pupil.locator('.bmi-number')).toContainText('18.9');
+ await answer(pupil,'quiz');await expect(pupil.locator('.score-display')).toContainText('0');await click(pupil,'Buka kalkulator IMT');await pupil.getByLabel('Berat badan (kg)',{exact:false}).fill('45,5');await pupil.getByLabel('Tinggi badan (cm)',{exact:false}).fill('155');await click(pupil,'Hitung IMT');await expect(pupil.locator('.bmi-number')).toContainText('18.9');await pupil.setViewportSize({width:360,height:1000});await noOverflow(pupil);await capture(pupil,'student-calculator-360.png');await pupil.setViewportSize({width:1440,height:1000});await pupil.reload();await expect(pupil.locator('.bmi-number')).toContainText('18.9');
  await click(pupil,'Lanjut ke post-test');const progress=await data(student,'/student/progress');await expect(pupil.getByRole('heading',{name:'Post-test',exact:true})).toBeVisible();const postId=(await data(student,'/student/progress')).active_attempt_ids.post_test;const pre=await data(student,`/student/attempts/${first}`),post=await data(student,`/student/attempts/${postId}`);expect(post.questions).toEqual(pre.questions);
  await answer(pupil,'post-test');await click(pupil,'Lihat ringkasan');await expect(pupil.getByRole('heading',{name:'Perjalanan yang tuntas.'})).toBeVisible();await expect(pupil.locator('.summary-stats strong')).toHaveText(['0/100','0/100','0/100']);await expect(pupil.locator('.answer-review details')).toHaveCount(pre.questions.length*2);
  for(const width of [360,768,1024,1440]){await pupil.setViewportSize({width,height:1000});await noOverflow(pupil);await capture(pupil,`student-summary-${width}.png`);}
@@ -125,7 +125,7 @@ test('enrollment transport failure retains original action and blocks new contex
  const blocked=await browser.newContext({baseURL:origin});const other=await blocked.newPage();let posts=0,reads=0;
  other.on('request',r=>{if(r.url().endsWith('/api/v1/csrf'))reads++;});await other.route('**/api/v1/student/sessions',async route=>{posts++;await route.abort('failed');});
  await enrollmentForm(other,school,'Siswa sintetis uncertain');await click(other,'Mulai pre-test');await expect(other.getByRole('alert').filter({hasText:'Koneksi terputus'})).toBeVisible();const initialReads=reads;
- await blocked.clearCookies();await other.reload();await expect(other.getByRole('button',{name:'Pulihkan sesi tersimpan'})).toBeVisible();await expect(other.getByLabel('Nama lengkap',{exact:false})).toHaveValue('Siswa sintetis uncertain');await click(other,'Mulai pre-test');await expect(other.getByRole('alert').filter({hasText:'Konteks pendaftaran'})).toBeVisible();expect(posts).toBe(1);expect(reads).toBe(initialReads);
+ await blocked.clearCookies();await other.reload();await expect(other.getByRole('button',{name:'Pulihkan sesi tersimpan'})).toBeVisible();await expect(other.getByLabel('Nama lengkap',{exact:false})).toHaveValue('Siswa sintetis uncertain');await expect(other.getByRole('button',{name:'Mulai pre-test',exact:true})).toBeDisabled();await expect(other.getByRole('alert').filter({hasText:'Konteks pendaftaran'})).toBeVisible();expect(posts).toBe(1);expect(reads).toBe(initialReads);
  await capture(other,'enrollment-uncertain-blocked.png');await blocked.close();
 });
 test('committed enrollment with lost response body recovers only through authenticated me and rebinds CSRF',async({browser})=>{

@@ -18,3 +18,9 @@
 
 /* The longer admin label must wrap below branding rather than overflow a narrow login header. */
 .login-header{flex-wrap:wrap}.login-switch{margin-left:auto;min-height:44px}
+
+/* The school pager also lives inside a tablet two-column login form. */
+.school-picker .pagination{padding-inline:0;flex-wrap:wrap}.school-picker .pagination>div{max-width:100%;flex-wrap:wrap}
+
+/* Target-role logout adds a third header item; keep the pre-test header usable on phones. */
+.assessment-shell>header{flex-wrap:wrap}.assessment-shell>header>span{overflow-wrap:anywhere}

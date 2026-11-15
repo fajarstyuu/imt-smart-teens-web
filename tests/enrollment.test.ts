@@ -1,4 +1,5 @@
 import { expect,test,vi } from 'vitest';
+import { ApiError } from '../src/services/http';
 import { EnrollmentOperation } from '../src/services/enrollment';
 const identity={name:'Siswa sintetis',school:'school-id',date:'2026-11-16'};
 const memory=()=>{let v:string|null=null;return {getItem:()=>v,setItem:(_k:string,x:string)=>{v=x;},removeItem:()=>{v=null;}};};
@@ -17,4 +18,10 @@ test('reload leaves uncertain unauthenticated enrollment blocked even with fresh
  expect(restored.pending()).toEqual(identity);
  await expect(restored.run(identity,'fresh',send)).rejects.toThrow(/konteks/i);expect(send).not.toHaveBeenCalled();
  restored.recovered();expect(restored.pending()).toBeNull();
+});
+test('uncertain enrollment is not released by a later rejection or idempotency conflict',async()=>{
+ const storage=memory();const op=new EnrollmentOperation(storage);
+ const send=vi.fn().mockRejectedValueOnce(Error('lost')).mockRejectedValueOnce(new ApiError('rate limited',429,'RATE_LIMITED')).mockRejectedValueOnce(new ApiError('conflict',409,'IDEMPOTENCY_CONFLICT'));
+ await expect(op.run(identity,'original',send)).rejects.toThrow();await expect(op.run(identity,'later',send)).rejects.toThrow();expect(op.pending()).toEqual(identity);
+ await expect(op.run(identity,'later',send)).rejects.toThrow();expect(op.pending()).toEqual(identity);expect(send.mock.calls.every(call=>call[1]===send.mock.calls[0][1]&&call[2]==='original')).toBe(true);
 });
