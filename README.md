@@ -2,6 +2,16 @@
 
 React + TypeScript frontend for the reviewed Rust v1 API. The Indonesian UI preserves the existing Editorial Campus palette, typography, photography, clean BrowserRouter URLs and legacy hash redirects. Student views use public pinned content only; admin editors and scoped historical reports are separate views.
 
+## Production containers and domains
+
+The production frontend is a compiled Vite build served by the non-root Nginx `Dockerfile`, not Vite preview. `deploy/nginx.conf` proxies same-origin `/api/v1/` to the private backend. The API repository owns `deploy/compose.production.yaml`, private setup/migration/backup commands and host TLS templates; see its `docs/deployment.md` for the complete operator sequence and rollback.
+
+- Browser origin: `https://imtsmartteens.my.id`; API hostname `https://api.imtsmartteens.my.id` deliberately returns403 for direct application access.
+- Only the frontend publishes loopback5180; backend/PostgreSQL stay on private networks. Host Nginx supplies sanitized client IP, preserves Origin and owns TLS. CORS does not make public frontend proxy endpoints inaccessible to HTTP clients; sessions, CSRF and authorization remain required.
+- `vite.config.ts` retains loopback development proxying, preserves Origin, verifies upstream TLS and explicitly allows the frontend hostname. `RUST_API_ORIGIN` is development/preview configuration, not a browser-exposed production API secret.
+- Run `LD_LIBRARY_PATH=/private/browser/library/path node deploy/verify-public.mjs` when the minimal host needs extracted browser libraries. It verifies the actual HTTPS anonymous desktop/mobile UI with no production account/content mutations; four screenshots and a console report are written to ignored `test-results/deployment-public`.
+- Production starts with an empty real school/admin/content setup, not browser fixtures. Authenticated end-to-end/zoom tests belong to the separate synthetic integration environment; do not point them at production.
+
 ## Run against Rust
 
 Use the lockfile with Node22.12+ (this integration was exercised with Node26):
@@ -24,7 +34,7 @@ npm start
 
 The build type-checks, emits `dist/app.html`, and publishes the SPA entry as `index.html` with generated `assets/app-*` files. `npm start` serves that build through loopback Vite preview5173 and the same Rust proxy. Both services remain separate processes. Stop only processes you started.
 
-`RUST_API_ORIGIN` changes the **Node-side** dev/preview proxy target; default `http://127.0.0.1:4180`. Do not put credentials or database URLs in `VITE_*` variables. The browser always uses same-origin `/api/v1`. Production hosting must serve `index.html` for extensionless frontend routes, proxy the real API separately, use secure HttpOnly cookies and an explicitly allowlisted frontend Origin. Host/nginx/deployment configuration is not changed here.
+`RUST_API_ORIGIN` changes the **Node-side** dev/preview proxy target; default `http://127.0.0.1:4180`. Do not put credentials or database URLs in `VITE_*` variables. The browser always uses same-origin `/api/v1`. Production hosting must serve `index.html` for extensionless frontend routes, proxy the real API separately, use secure HttpOnly cookies and an explicitly allowlisted frontend Origin. The local preview instructions above do not configure public hosting; production container/domain settings are described in the production section and API deployment guide.
 
 ## Sessions, retries and persistence
 
