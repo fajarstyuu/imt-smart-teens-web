@@ -11,8 +11,10 @@ const evidence=resolve('test-results/evidence');
 let testsRun=0;
 // Honor the real per-IP 300 requests/60s policy. Do not disable it or retry business writes.
 // The full CMS journey is one budget; the remaining small tests share the next window.
-test.beforeEach(async({},info)=>{if(testsRun===0||info.title.startsWith('enrollment transport'))await new Promise(resolve=>setTimeout(resolve,61000));testsRun++;});
+// Large correction scenarios each start a fresh real limiter window; no API retries/bypass.
+test.beforeEach(async({},info)=>{if(testsRun===0||info.title.startsWith('enrollment transport')||info.title.startsWith('dirty Rust'))await new Promise(resolve=>setTimeout(resolve,61000));testsRun++;});
 async function data(context:BrowserContext,path:string){const response=await context.request.get('/api/v1'+path);expect(response.status(),`GET ${path}`).toBe(200);return (await response.json()).data;}
+async function command(context:BrowserContext,path:string,method:'POST'|'PUT',body:unknown,status=200){const csrf=await data(context,'/csrf');const response=await context.request.fetch('/api/v1'+path,{method,headers:{Origin:origin,'X-CSRF-Token':csrf.token},data:body});expect(response.status(),`${method} ${path}`).toBe(status);return (await response.json()).data;}
 async function login(context:BrowserContext){
  if(!process.env.E2E_PRIVATE_ENV)throw Error('E2E_PRIVATE_ENV must reference an operator-owned synthetic integration environment.');
  process.loadEnvFile(process.env.E2E_PRIVATE_ENV);
@@ -37,6 +39,24 @@ async function answer(page:Page,type:'pre-test'|'quiz'|'post-test',clear=false){
  await click(page,`Kirim ${type}`);await expect(page.getByRole('dialog')).toBeVisible();await click(page,'Kirim jawaban');
  await expect(page.getByRole('heading',{name:/Jawabanmu sudah terkirim|Seluruh tahap telah selesai/})).toBeVisible();
 }
+async function failedQuizNavigation(page:Page,context:BrowserContext){
+ await expect(page.getByRole('heading',{name:'Quiz',exact:true})).toBeVisible();
+ const progress=await data(context,'/student/progress');const id=progress.active_attempt_ids.quiz;const initial=await data(context,'/student/attempts/'+id);const question=initial.questions[0];
+ let fault=true;const pattern='**/api/v1/student/attempts/*/answers/*';
+ await page.route(pattern,async route=>{if(!fault){await route.continue();return;}fault=false;const response=await route.fetch();expect(response.status()).toBe(200);await route.fulfill({response,body:'{'});});
+ await page.locator('.answer-option input').first().check();await expect(page.locator('.save-status')).toHaveText('Jawaban belum tersimpan');await expect(page.locator('.answer-option input').first()).toBeChecked();
+ const stable={href:page.url(),index:await page.evaluate(()=>history.state.idx)};let prompts=0;const dismiss=(dialog:import('@playwright/test').Dialog)=>{prompts++;void dialog.dismiss();};page.on('dialog',dismiss);
+ await click(page,'Beranda');expect(prompts).toBe(1);await expect(page).toHaveURL(stable.href);
+ await page.evaluate(()=>history.back());await expect.poll(()=>prompts).toBe(2);await expect.poll(()=>page.evaluate(()=>({href:location.href,index:history.state.idx}))).toEqual(stable);
+ await click(page,'Keluar');expect(prompts).toBe(3);expect((await context.request.get('/api/v1/student/me')).status()).toBe(200);await expect(page.locator('.answer-option input').first()).toBeChecked();await expect(page.locator('.save-status')).toHaveText('Jawaban belum tersimpan');await capture(page,'quiz-unknown-ack-navigation-canceled.png');
+ page.off('dialog',dismiss);await page.unroute(pattern);
+ // Lost acknowledgement really committed in Rust. Deliberate retry first reconciles its real409.
+ const committed=await data(context,'/student/attempts/'+id);expect(committed.answers.find((a:any)=>a.snapshot_question_id===question.id).revision).toBe(1);
+ await click(page,'Coba lagi');await expect(page.getByRole('alert')).toContainText('Jawaban diubah di tempat lain');await expect(page.locator('.answer-option input').first()).toBeChecked();await click(page,'Coba lagi');await expect(page.locator('.save-status')).toContainText('Jawaban tersimpan');
+ const saved=await data(context,'/student/attempts/'+id);const answer=saved.answers.find((a:any)=>a.snapshot_question_id===question.id);expect(answer.revision).toBe(2);expect(answer.option_ids).toEqual([question.options[0].id]);
+ await click(page,'Beranda');await expect(page).toHaveURL(/\/beranda$/);await click(page,'Quiz');await expect(page).toHaveURL(/\/quiz$/);await expect(page.locator('.answer-option input').first()).toBeChecked();await page.reload();await expect(page.locator('.answer-option input').first()).toBeChecked();expect(prompts).toBe(3);
+ console.log('I1 Rust unknown acknowledgement',{canceledNavigationPrompts:prompts,confirmedAnswerRevision:answer.revision,restoredSelection:true});
+}
 test('real CMS publications, full student journey, scoped historical reporting and archive',async({browser})=>{
  mkdirSync(evidence,{recursive:true});
  const admin=await browser.newContext({baseURL:origin,viewport:{width:1440,height:1000}});await login(admin);
@@ -53,12 +73,26 @@ test('real CMS publications, full student journey, scoped historical reporting a
  await page.reload();await page.getByLabel('Cari sekolah',{exact:true}).fill(schoolName);await expect(page.getByText(schoolName,{exact:true})).toBeVisible();
  await capture(page,'admin-schools-desktop.png');await page.setViewportSize({width:360,height:1000});await noOverflow(page);await capture(page,'admin-schools-360.png');await page.setViewportSize({width:1440,height:1000});
  // Author via browser CMS. On retries, inspect and reuse this test's already-authored drafts, never wipe data.
+ const reviewedLessons:{id:string;draft:{title:string;description:string;sections:{id:string;title:string;body:string;required:boolean}[]}}[]=[];
  for(let i=1;i<=2;i++){
   const title=`Materi sintetis integrasi ${i}`;const existing=(await data(admin,'/admin/lessons?limit=100&offset=0')).find((l:any)=>l.draft.title===title&&l.state!=='archived');
   await page.goto(existing?`/admin/materi/${existing.id}`:'/admin/materi/baru');await expect(page.getByLabel('Judul materi',{exact:false})).toBeVisible();
   await page.getByLabel('Judul materi',{exact:false}).fill(title);await page.getByLabel('Deskripsi',{exact:true}).fill('Materi pengukuran sintetis untuk verifikasi integrasi.');
   await page.getByLabel('Judul bagian 1',{exact:true}).fill('Pengukuran yang tercatat');await page.getByLabel('Isi materi 1',{exact:true}).fill('Gunakan alat pengukuran sesuai petunjuk pendamping. Catat hasil pengukuran dengan satuan yang tepat.');
-  await click(page,'Simpan draf');await expect(page.getByRole('button',{name:'Terbitkan materi',exact:true})).toBeEnabled();await click(page,'Terbitkan materi');await expect(page.getByRole('status').filter({hasText:'Versi materi diterbitkan'})).toBeVisible();
+  await click(page,'Simpan draf');await expect(page.getByRole('button',{name:'Terbitkan materi',exact:true})).toBeEnabled();
+  const id=new URL(page.url()).pathname.split('/').pop()!;const savedA=await data(admin,'/admin/lessons/'+id);
+  // A clean editor and a dirty editor both keep visible A while independent editor B saves.
+  const localDescription=i===2?'Draf lokal A yang harus ditinjau.':savedA.draft.description;
+  if(i===2)await page.getByLabel('Deskripsi',{exact:true}).fill(localDescription);
+  const serverB={...savedA.draft,title:'Server B tidak ditampilkan '+i,description:'Deskripsi server B',sections:savedA.draft.sections.map((s:any)=>({...s,body:'Isi server B tidak ditinjau.'}))};
+  await command(admin,'/admin/lessons/'+id,'PUT',{...serverB,position:savedA.position,expected_revision:savedA.revision});
+  await click(page,'Muat revisi terbaru');await expect(page.getByRole('status').filter({hasText:'Revisi dan posisi terbaru dimuat'})).toBeVisible();
+  await expect(page.getByLabel('Judul materi',{exact:false})).toHaveValue(title);await expect(page.getByLabel('Deskripsi',{exact:true})).toHaveValue(localDescription);await expect(page.getByLabel('Isi materi 1',{exact:true})).toHaveValue(savedA.draft.sections[0].body);
+  await expect(page.getByRole('button',{name:'Terbitkan materi',exact:true})).toBeDisabled();await expect(page.getByText('Perubahan belum disimpan',{exact:true})).toBeVisible();
+  await click(page,'Pratinjau');await expect(page.locator('.lesson-preview')).toContainText(title);await expect(page.locator('.lesson-preview')).not.toContainText(serverB.title);await capture(page,`lesson-refresh-${i===1?'clean':'dirty'}-divergence.png`);
+  await click(page,'Simpan draf');await expect(page.getByRole('button',{name:'Terbitkan materi',exact:true})).toBeEnabled();
+  const reviewed=await data(admin,'/admin/lessons/'+id);expect(reviewed.draft).toEqual({...savedA.draft,description:localDescription});reviewedLessons.push({id,draft:reviewed.draft});
+  await click(page,'Terbitkan materi');await expect(page.getByRole('status').filter({hasText:'Versi materi diterbitkan'})).toBeVisible();
  }
  for(const bank of banks){
   for(let i=1;i<=2;i++){
@@ -89,9 +123,12 @@ test('real CMS publications, full student journey, scoped historical reporting a
  await click(pupil,'Mulai belajar');await click(pupil,'Buka materi');await expect(pupil.locator('.lesson-body')).toBeVisible();await pupil.setViewportSize({width:360,height:1000});await noOverflow(pupil);await capture(pupil,'student-lesson-360.png');await pupil.setViewportSize({width:1440,height:1000});
  const lessons=(await data(student,'/student/progress')).lessons;
  for(let i=0;i<lessons.length;i++){
+  const pinned=await data(student,'/student/lessons/'+lessons[i].lesson_id);const reviewed=reviewedLessons.find(l=>l.id===lessons[i].lesson_id);expect(reviewed).toBeTruthy();expect(pinned.title).toBe(reviewed!.draft.title);expect(pinned.description).toBe(reviewed!.draft.description);expect(pinned.sections.map(({title,body,required}:any)=>({title,body,required}))).toEqual(reviewed!.draft.sections.map(({title,body,required})=>({title,body,required})));expect(pinned.lesson_version_id).toBe(lessons[i].lesson_version_id);
   await expect(pupil.locator('.lesson-body')).toBeVisible();const next=pupil.getByRole('button',{name:'Bagian berikutnya',exact:true});while(await next.count()&&await next.isVisible()){await expect(next).toBeEnabled();await next.click();}
   await expect(pupil.getByRole('button',{name:'Selesai & lanjut',exact:true})).toBeEnabled();await click(pupil,'Selesai & lanjut');
  }
+ await failedQuizNavigation(pupil,student);
+ console.log('I2 Rust publication readback',{visibleDraftsPublished:reviewedLessons.length,pinnedLessonTextAndSectionsMatch:true,cleanAndDirtyRefreshBlocked:true});
  await answer(pupil,'quiz');await expect(pupil.locator('.score-display')).toContainText('0');await click(pupil,'Buka kalkulator IMT');await pupil.getByLabel('Berat badan (kg)',{exact:false}).fill('45,5');await pupil.getByLabel('Tinggi badan (cm)',{exact:false}).fill('155');await click(pupil,'Hitung IMT');await expect(pupil.locator('.bmi-number')).toContainText('18.9');await pupil.setViewportSize({width:360,height:1000});await noOverflow(pupil);await capture(pupil,'student-calculator-360.png');await pupil.setViewportSize({width:1440,height:1000});await pupil.reload();await expect(pupil.locator('.bmi-number')).toContainText('18.9');
  await click(pupil,'Lanjut ke post-test');const progress=await data(student,'/student/progress');await expect(pupil.getByRole('heading',{name:'Post-test',exact:true})).toBeVisible();const postId=(await data(student,'/student/progress')).active_attempt_ids.post_test;const pre=await data(student,`/student/attempts/${first}`),post=await data(student,`/student/attempts/${postId}`);expect(post.questions).toEqual(pre.questions);
  await answer(pupil,'post-test');await click(pupil,'Lihat ringkasan');await expect(pupil.getByRole('heading',{name:'Perjalanan yang tuntas.'})).toBeVisible();await expect(pupil.locator('.summary-stats strong')).toHaveText(['0/100','0/100','0/100']);await expect(pupil.locator('.answer-review details')).toHaveCount(pre.questions.length*2);
@@ -184,6 +221,36 @@ test('real revision conflict preserves CMS input; draft archive confirms and pre
  const beforeArchive=await data(context,'/admin/lessons/'+id);const archiveCsrf=await data(context,'/csrf');const changed=await context.request.put('/api/v1/admin/lessons/'+id,{headers:{Origin:origin,'X-CSRF-Token':archiveCsrf.token},data:{...beforeArchive.draft,position:beforeArchive.position,expected_revision:beforeArchive.revision}});expect(changed.status()).toBe(200);
  await click(page,'Ya, arsipkan');await expect(page.getByRole('dialog').getByRole('alert')).toBeVisible();await capture(page,'admin-archive-conflict-dialog.png');await click(page,'Kembali');await click(page,'Muat revisi terbaru');await expect(page.getByRole('status').filter({hasText:'Revisi dan posisi terbaru dimuat'})).toBeVisible();await click(page,'Arsipkan materi');await click(page,'Ya, arsipkan');await expect(page.getByRole('button',{name:'Simpan draf',exact:true})).toBeDisabled();const archived=await data(context,'/admin/lessons/'+id);expect(archived.state).toBe('archived');expect((await data(context,'/admin/learning-path')).lesson_ids).not.toContain(id);
  await context.close();
+});
+test('dirty Rust lesson and question editors preserve canceled fragment/multistep history and role logout',async({browser})=>{
+ mkdirSync(evidence,{recursive:true});
+ for(const kind of ['lesson','question'] as const){
+  const context=await browser.newContext({baseURL:origin});await login(context);const page=await context.newPage();const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
+  let original:string;let field:import('@playwright/test').Locator;
+  if(kind==='lesson'){
+   const lesson=(await data(context,'/admin/lessons?limit=25&offset=0')).find((l:any)=>l.state!=='archived');original=lesson.draft.title;await page.goto('/admin/materi');await click(page,'Edit '+original);field=page.getByLabel('Judul materi',{exact:false});
+  }else{
+   const bank=(await data(context,'/admin/question-banks'))[0];const question=(await data(context,`/admin/question-banks/${bank.id}/questions?limit=25&offset=0`)).find((q:any)=>q.state!=='archived');original=question.draft.text;await page.goto('/admin/soal?bank='+bank.id);await click(page,'Edit pertanyaan '+question.position);field=page.getByLabel('Pertanyaan',{exact:true});
+  }
+  await field.fill('Draf navigasi '+kind);const editorUrl=page.url();const editorIndex=await page.evaluate(()=>history.state.idx);
+  const skip=page.getByRole('link',{name:'Lewati ke konten utama'});await skip.focus();await page.keyboard.press('Enter');await expect(page).toHaveURL(editorUrl+'#main-content');await expect.poll(()=>page.evaluate(()=>history.state.idx)).toBe(editorIndex+1);
+  let prompts=0;let accept=false;const handle=(dialog:import('@playwright/test').Dialog)=>{prompts++;void (accept?dialog.accept():dialog.dismiss());};page.on('dialog',handle);
+  const canceled=async(delta:number,expected:number,stable:{href:string;index:number})=>{await page.evaluate(n=>history.go(n),delta);await expect.poll(()=>prompts).toBe(expected);await expect.poll(()=>page.evaluate(()=>({href:location.href,index:history.state.idx}))).toEqual(stable);await expect(field).toHaveValue('Draf navigasi '+kind);};
+  await canceled(-1,1,{href:editorUrl+'#main-content',index:editorIndex+1});
+  await page.evaluate(()=>{const target=document.createElement('div');target.id='history-regression-target';document.body.append(target);const link=document.createElement('a');link.id='history-regression-link';link.href='#history-regression-target';link.textContent='Fragment history regression';document.body.append(link);});
+  await page.locator('#history-regression-link').focus();await page.keyboard.press('Enter');await expect(page).toHaveURL(editorUrl+'#history-regression-target');await expect.poll(()=>page.evaluate(()=>history.state.idx)).toBe(editorIndex+2);
+  const stable={href:page.url(),index:editorIndex+2};await canceled(-1,2,stable);await canceled(-1,3,stable);await canceled(-2,4,stable);await canceled(-3,5,stable);
+  await page.locator('.teacher-account').click();await click(page,'Keluar ruang admin');expect(prompts).toBe(6);expect((await context.request.get('/api/v1/admin/me')).status()).toBe(200);await expect(field).toHaveValue('Draf navigasi '+kind);await expect(page.getByRole('dialog',{name:'Akun admin'})).toBeVisible();await page.keyboard.press('Escape');await capture(page,`dirty-${kind}-history-canceled.png`);
+  const target=kind==='lesson'?'Bank soal':'Materi';const targetUrl=kind==='lesson'?'/admin/soal':'/admin/materi';await click(page,target);expect(prompts).toBe(7);await expect(page).toHaveURL(stable.href);await expect(field).toHaveValue('Draf navigasi '+kind);
+  accept=true;await click(page,target);await expect(page).toHaveURL(origin+targetUrl);await expect(page.getByRole('heading',{name:target,exact:true})).toBeVisible();expect(prompts).toBe(8);
+  await page.goBack();await expect(page).toHaveURL(stable.href);await expect(field).toHaveValue(original);
+  await page.goBack();await expect(page).toHaveURL(editorUrl+'#main-content');await expect(field).toHaveValue(original);await page.goBack();await expect(page).toHaveURL(editorUrl);await expect(field).toHaveValue(original);
+  await page.goForward();await expect(page).toHaveURL(editorUrl+'#main-content');await page.goForward();await expect(page).toHaveURL(stable.href);await expect(field).toHaveValue(original);await page.goForward();await expect(page).toHaveURL(origin+targetUrl);await expect(page.getByRole('heading',{name:target,exact:true})).toBeVisible();expect(prompts).toBe(8);
+  await page.goBack();await expect(field).toHaveValue(original);await field.fill('Draf logout '+kind);await page.locator('.teacher-account').click();accept=false;await click(page,'Keluar ruang admin');expect(prompts).toBe(9);expect((await context.request.get('/api/v1/admin/me')).status()).toBe(200);await expect(field).toHaveValue('Draf logout '+kind);
+  accept=true;await click(page,'Keluar ruang admin');await expect(page.getByRole('heading',{name:'Masuk ruang admin.'})).toBeVisible();await expect(page).toHaveURL(stable.href);expect(prompts).toBe(10);expect((await context.request.get('/api/v1/admin/me')).status()).toBe(401);
+  await login(context);await page.reload();await expect(page).toHaveURL(stable.href);await expect(field).toHaveValue(original);expect(prompts).toBe(10);expect(errors).toEqual([]);
+  console.log('I3 Rust navigation',{editor:kind,cancelAndAcceptPrompts:prompts,sessionPreservedOnCancel:true,sessionRevokedOnAccept:true,backForwardCoherent:true});await context.close();
+ }
 });
 test('clean and legacy routes, denied localStorage, mobile keyboard forms and reduced motion',async({browser})=>{
  const context=await browser.newContext({baseURL:origin,reducedMotion:'reduce'});await context.addInitScript(()=>{Object.defineProperty(window,'localStorage',{get(){throw new DOMException('Denied','SecurityError');}});});const page=await context.newPage();

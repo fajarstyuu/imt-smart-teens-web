@@ -47,6 +47,6 @@ for(const dirty of [false,true])test(`lesson refresh acknowledges server baselin
  await user.click(screen.getByRole('button',{name:'Simpan draf'}));await waitFor(()=>expect(screen.getByRole('button',{name:'Terbitkan materi'})).toHaveProperty('disabled',false));expect(adminApi.saveLesson).toHaveBeenCalledWith('lesson',expect.objectContaining({title:dirty?'A local':'A'}),1,2);
 });
 test('one saved/unmounted guard does not clear a separate dirty editor',()=>{
- function Owner({dirty}:{dirty:boolean}){useUnsaved(dirty);return null;}
- const view=render(<><Owner dirty/><Owner dirty={false}/></>);const confirm=vi.spyOn(window,'confirm').mockReturnValue(false);expect(navigationAllowed()).toBe(false);view.rerender(<Owner dirty/>);expect(navigationAllowed()).toBe(false);expect(confirm).toHaveBeenCalledTimes(2);
+ function Owner({dirty,name}:{dirty:boolean;name:string}){const saved=useUnsaved(dirty);return <button onClick={saved}>{name}</button>;}
+ const view=render(<><Owner key="one" name="one" dirty/><Owner key="two" name="two" dirty/><Owner key="clean" name="clean" dirty={false}/></>);const confirm=vi.spyOn(window,'confirm').mockReturnValue(false);expect(navigationAllowed()).toBe(false);fireEvent.click(screen.getByRole('button',{name:'one'}));expect(navigationAllowed()).toBe(false);view.rerender(<Owner key="two" name="two" dirty/>);expect(navigationAllowed()).toBe(false);expect(confirm).toHaveBeenCalledTimes(3);fireEvent.click(screen.getByRole('button',{name:'two'}));expect(navigationAllowed()).toBe(true);expect(confirm).toHaveBeenCalledTimes(3);
 });

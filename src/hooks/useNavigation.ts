@@ -2,6 +2,12 @@ import { useCallback, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { navigationAllowed } from './useUnsaved';
 
+// `window` is the POP event target: capture alone does not outrank an older
+// listener there. Install this dispatcher at module load, BEFORE BrowserRouter
+// subscribes, or Router can unmount a dirty owner before we ask for consent.
+let activePopGuard:((event:PopStateEvent)=>void)|null=null;
+if(typeof window!=='undefined')window.addEventListener('popstate',event=>activePopGuard?.(event),true);
+
 /**
  * Exposes the app's route path and a guarded navigation action. BrowserRouter owns
  * route state; this adapter keeps existing page components independent of router APIs.
@@ -28,8 +34,8 @@ export function useNavigation() {
     let ignoredFragmentHashchange: string | null = null;
     let rollbackToIndex: number | null = null;
     /**
-     * BrowserRouter applies POP events in the bubble phase. Intercepting during
-     * capture lets us cancel Back/Forward before route content changes; on cancel,
+     * The early dispatcher runs before BrowserRouter's window POP listener,
+     * letting us cancel Back/Forward before route content changes; on cancel,
      * move the browser back to its prior history index and let that event sync Router.
      */
     const guardPop = (event: PopStateEvent) => {
@@ -112,9 +118,9 @@ export function useNavigation() {
       window.history.replaceState({ ...initialState, idx: currentIndex.current }, '', window.location.href);
     }
     currentHref.current = window.location.href;
-    window.addEventListener('popstate', guardPop, true);
+    activePopGuard=guardPop;
     window.addEventListener('hashchange', indexFragmentEntry);
-    return () => { window.removeEventListener('popstate', guardPop, true); window.removeEventListener('hashchange', indexFragmentEntry); };
+    return () => { if(activePopGuard===guardPop)activePopGuard=null; window.removeEventListener('hashchange', indexFragmentEntry); };
   }, []);
 
   const navigate = useCallback((next: string) => {
