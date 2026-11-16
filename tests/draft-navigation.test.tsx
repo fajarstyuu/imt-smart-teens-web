@@ -2,7 +2,9 @@ import {afterEach,expect,test,vi} from 'vitest';
 import {act,cleanup,fireEvent,render,screen,waitFor} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {BrowserRouter,Routes,Route} from 'react-router-dom';
-import {AppProvider} from '../src/hooks/useApp';
+import {AppProvider,useApp} from '../src/hooks/useApp';
+import {StudentShell} from '../src/components/StudentShell';
+import {AssessmentPage} from '../src/pages/AssessmentPage';
 import {useAssessment} from '../src/hooks/useAssessment';
 import {useNavigation} from '../src/hooks/useNavigation';
 import {useUnsaved,navigationAllowed} from '../src/hooks/useUnsaved';
@@ -27,6 +29,15 @@ test('in-flight and unknown-ack answer guard unload, cancellation and explicit d
  const unload=new Event('beforeunload',{cancelable:true});window.dispatchEvent(unload);expect(unload.defaultPrevented).toBe(true);
  const confirm=vi.spyOn(window,'confirm').mockReturnValue(false);await user.click(screen.getByRole('button',{name:'Menu'}));expect(window.location.pathname).toBe('/quiz');expect(screen.getByLabelText('Pilihan')).toHaveProperty('checked',true);
  await act(async()=>reject(new Error('Acknowledgement unknown')));await screen.findByText('Acknowledgement unknown');expect(screen.getByTestId('revision').textContent).toBe('0');confirm.mockReturnValue(true);await user.click(screen.getByRole('button',{name:'Menu'}));expect(window.location.pathname).toBe('/away');expect(navigationAllowed()).toBe(true);
+});
+for(const pre of [false,true])test(`canceling dirty ${pre?'pre-test':'quiz'} logout preserves answer and session; accepted logout prompts once`,async()=>{
+ const signOut=vi.fn().mockResolvedValue(undefined);
+ const student={identity:{name:'Siswa sintetis',school:'Sekolah'},attempts:{},serverProgress:{current_stage:'quiz',stages:[{id:'pre_test',status:'completed'},{id:'lessons',status:'completed'},{id:'quiz',status:'current'}],lessons:[]}};
+ const services={bootstrap:async()=>({config:{brand:'Test',program:'Test',mode:'development'},student,teacher:null}),student:{attempt:async()=>attempt,saveAnswer:async()=>{throw Error('Offline answer');},signOut}} as unknown as AppServices;
+ function Host(){const {data,loading}=useApp();const {navigate}=useNavigation();if(loading)return null;if(!data.student)return <h1>Signed out</h1>;return pre?<AssessmentPage type="pre" navigate={navigate}/>:<StudentShell path="/quiz" navigate={navigate}><Answers/></StudentShell>;}
+ window.history.replaceState({idx:0},'','/quiz');render(<BrowserRouter><AppProvider services={services}><Host/></AppProvider></BrowserRouter>);const user=userEvent.setup();await user.click(await screen.findByLabelText(pre?/Pilihan/:/^Pilihan$/));await screen.findByText('Offline answer');
+ const confirm=vi.spyOn(window,'confirm').mockReturnValue(false);await user.click(screen.getByRole('button',{name:'Keluar',exact:true}));expect(confirm).toHaveBeenCalledTimes(1);expect(signOut).not.toHaveBeenCalled();expect(screen.getByLabelText(pre?/Pilihan/:/^Pilihan$/)).toHaveProperty('checked',true);expect(screen.queryByText('Signed out')).toBeNull();
+ confirm.mockReturnValue(true);await user.click(screen.getByRole('button',{name:'Keluar',exact:true}));await screen.findByText('Signed out');expect(signOut).toHaveBeenCalledTimes(1);expect(confirm).toHaveBeenCalledTimes(2);expect(window.location.pathname).toBe('/');expect(navigationAllowed()).toBe(true);
 });
 const lesson:LessonDto={id:'lesson',position:1,revision:1,state:'draft',draft:{title:'A',description:'Visible A',sections:[{id:'section',title:'Section A',body:'Body A',required:true}]},versions:[]};
 for(const dirty of [false,true])test(`lesson refresh acknowledges server baseline without publishing undisplayed content (${dirty?'dirty':'clean'} local A)`,async()=>{
