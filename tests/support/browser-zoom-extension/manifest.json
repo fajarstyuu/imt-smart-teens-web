@@ -1,0 +1,7 @@
+{
+  "manifest_version": 3,
+  "name": "Isolated acceptance browser zoom",
+  "version": "1.0.0",
+  "description": "Permission-free test driver for Chrome's native per-tab zoom.",
+  "background": {"service_worker": "background.js"}
+}

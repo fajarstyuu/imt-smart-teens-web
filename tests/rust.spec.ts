@@ -134,6 +134,32 @@ test('committed enrollment with lost response body recovers only through authent
  await enrollmentForm(page,school,'Siswa sintetis committed recovery');await click(page,'Mulai pre-test');await expect(page.getByRole('alert').filter({hasText:'Koneksi terputus'})).toBeVisible();await click(page,'Pulihkan sesi tersimpan');await expect(page.getByRole('heading',{name:'Pre-test',exact:true})).toBeVisible();await page.locator('.answer-option input').first().check();await expect(page.locator('.save-status')).toContainText('Jawaban tersimpan');expect(posts).toBe(1);
  await page.reload();await expect(page.locator('.answer-option input').first()).toBeChecked();await context.close();
 });
+test('committed enrollment projection failure retries and reloads read-only without a second POST',async({browser})=>{
+ const context=await browser.newContext({baseURL:origin});const page=await context.newPage();
+ const school=(await data(context,'/schools?limit=25&offset=0'))[0];let posts=0,csrfReads=0,fail=true;
+ let original:{student:{id:string};enrollment:{id:string}}|undefined;
+ page.on('request',r=>{if(r.url().endsWith('/api/v1/csrf'))csrfReads++;});
+ await page.route('**/api/v1/student/sessions',async route=>{posts++;const response=await route.fetch();expect(response.status()).toBe(201);original=(await response.json()).data;await route.fulfill({response});});
+ // Only the required read is faulted. The POST and all persistence remain real Rust/PostgreSQL.
+ await page.route('**/api/v1/student/progress',async route=>{if(fail)await route.abort('failed');else await route.continue();});
+ await enrollmentForm(page,school,'Siswa sintetis projection recovery');await click(page,'Mulai pre-test');
+ await expect(page.getByRole('alert').filter({hasText:'Koneksi terputus'})).toBeVisible();
+ const journal=await page.evaluate(()=>sessionStorage.getItem('imt-pending-enrollment-v1'));
+ expect(journal).toBeTruthy();expect(posts).toBe(1);const initialCsrf=csrfReads;
+ await expect(page.getByLabel('Nama lengkap',{exact:false})).toHaveValue('Siswa sintetis projection recovery');
+ await expect(page.getByRole('button',{name:'Mulai pre-test',exact:true})).toBeDisabled();
+ await click(page,'Pulihkan sesi tersimpan');await expect(page.getByRole('alert').filter({hasText:'Koneksi terputus'})).toBeVisible();
+ expect(posts).toBe(1);expect(csrfReads).toBe(initialCsrf);expect(await page.evaluate(()=>sessionStorage.getItem('imt-pending-enrollment-v1'))).toBe(journal);
+ await page.reload();await expect(page.getByRole('button',{name:'Coba lagi',exact:true})).toBeVisible();
+ expect(posts).toBe(1);expect(csrfReads).toBe(initialCsrf);expect(await page.evaluate(()=>sessionStorage.getItem('imt-pending-enrollment-v1'))).toBe(journal);
+ fail=false;await click(page,'Coba lagi');await expect(page.getByRole('heading',{name:'Pre-test',exact:true})).toBeVisible();
+ const recovered=await data(context,'/student/me');expect(recovered.student.id).toBe(original!.student.id);expect(recovered.enrollment.id).toBe(original!.enrollment.id);
+ expect(await page.evaluate(()=>sessionStorage.getItem('imt-pending-enrollment-v1'))).toBeNull();
+ await page.locator('.answer-option input').first().check();await expect(page.locator('.save-status')).toContainText('Jawaban tersimpan');
+ await page.reload();await expect(page.locator('.answer-option input').first()).toBeChecked();expect(posts).toBe(1);
+ console.log('Committed projection recovery',{enrollmentPosts:posts,originalIdentityRestored:true,journalRetainedUntilProjection:true});
+ await context.close();
+});
 test('coexisting admin/student cookies restore independently, enforce ownership and logout only the target role',async({browser})=>{
  const context=await browser.newContext({baseURL:origin});await login(context);const school=(await data(context,'/schools?limit=25&offset=0'))[0];const page=await context.newPage();await enrollmentForm(page,school,'Siswa sintetis coexisting');await click(page,'Mulai pre-test');await expect(page.getByRole('heading',{name:'Pre-test',exact:true})).toBeVisible();
  const profile=await data(context,'/student/me');const first=(await data(context,'/student/progress')).active_attempt_ids.pre_test;expect((await context.request.get('/api/v1/admin/me')).status()).toBe(200);await page.reload();await expect(page.getByRole('heading',{name:'Pre-test',exact:true})).toBeVisible();

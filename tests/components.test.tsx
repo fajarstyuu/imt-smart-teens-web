@@ -32,5 +32,7 @@ test('stale answer preserves unsaved input, reconciles latest answer revision, a
 test('uncertain reloaded enrollment disables new submission and explains blocked context',async()=>{
  const pending={name:'Siswa tertahan',school:'school-uuid',date:'2026-11-16'};
  mount(<LoginPage navigate={()=>{}}/>,{...base,student:{...base.student,pendingEnrollment:()=>pending,enrollmentBlocked:()=>true}});
- expect(screen.getByRole('button',{name:'Mulai pre-test',exact:true})).toHaveProperty('disabled',true);expect(screen.getByText(/Konteks pendaftaran tidak dapat dipastikan/)).toBeTruthy();
+ expect(screen.getByRole('button',{name:'Mulai pre-test',exact:true})).toHaveProperty('disabled',true);
+ expect(screen.getByText(/Konteks pendaftaran.*Pendaftaran baru diblokir sampai seluruh data berhasil dimuat/)).toBeTruthy();
+ expect(screen.getByRole('button',{name:'Pulihkan sesi tersimpan',exact:true})).toBeTruthy();
 });

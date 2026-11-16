@@ -10,6 +10,7 @@
     "test": "npm run test:legacy-domain && vitest run",
     "test:legacy-domain": "node --test tests/domain.test.mjs",
     "test:e2e": "playwright test",
+    "test:e2e:zoom": "playwright test --config playwright.zoom.config.ts",
     "test:api": "playwright test tests/rust.spec.ts"
   },
   "dependencies": {
