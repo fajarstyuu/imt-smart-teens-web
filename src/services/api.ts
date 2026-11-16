@@ -15,34 +15,51 @@ async function optional<T>(load:()=>Promise<T>):Promise<T|null>{try{return await
 async function compose(profile?:Profile):Promise<Student>{
  const me=profile??await http.get<Profile>('/student/me');
  const p=await http.get<Progress>('/student/progress');
+ // Cookies can change between reads (another tab/session). Never combine a cached
+ // profile with another enrollment's progress or release its recovery journal.
+ if(p.enrollment_id!==me.enrollment.id||p.path_version_id!==me.enrollment.path_version_id)throw new ApiError('Sesi siswa berubah. Pulihkan ulang data sesi tersimpan.',409,'SESSION_CHANGED');
  const attempts:Student['attempts']={};
  for(const type of ['pre','quiz','post'] as const){const id=p.active_attempt_ids[kind[type]]??(current?.enrollmentId===me.enrollment.id?current.attempts[type]?.id:undefined);if(id)attempts[type]=attemptModel(await http.get<AttemptDto>(`/student/attempts/${id}`),type);}
  const measurements=p.latest_measurement_id?(await http.page<MeasurementDto>('/student/measurements?limit=25&offset=0')).data:[];
+ const verified=await http.get<Profile>('/student/me');
+ if(verified.student.id!==me.student.id||verified.enrollment.id!==me.enrollment.id)throw new ApiError('Sesi siswa berubah. Pulihkan ulang data sesi tersimpan.',409,'SESSION_CHANGED');
  const next=studentModel(me,p,attempts,measurements);
  // Keep already fetched permitted lesson bodies only within the same pinned enrollment.
  if(current?.enrollmentId===next.enrollmentId)next.lessons=next.lessons.map(l=>{const previous=current!.lessons.find(x=>x.id===l.id);return previous?{...l,sections:previous.sections,visited:previous.visited,description:previous.description}:l;});
  current=next;return next;
 }
 const need=()=>{if(!current)throw new ApiError('Sesi siswa tidak tersedia.',401,'UNAUTHORIZED');return current;};
+/** Recovery is authenticated and read-only. Clear the journal only after every
+ * required projection read and explicit CSRF rebind succeeds, never on GET errors.
+ */
+async function recoverStudent(profile?:Profile){
+ const authenticated=profile??await http.get<Profile>('/student/me');
+ enrollment.committed();
+ const restored=await compose(authenticated);
+ await http.csrf();enrollment.recovered();return restored;
+}
 export const api:AppServices={
  async bootstrap(){
   const [profile,admin]=await Promise.all([optional(()=>http.get<Profile>('/student/me')),optional(()=>http.get<{admin:Admin}>('/admin/me'))]);
-  if(profile)enrollment.recovered();
   // A fresh CSRF GET cannot prove that an expired enrollment-context cookie survived.
-  if(!enrollment.pending()&&!enrollment.isBlocked())await http.csrf();
-  current=profile?await compose(profile):null;
+  if(profile)current=await recoverStudent(profile);
+  else {current=null;if(!enrollment.pending()&&!enrollment.isBlocked())await http.csrf();}
   return {config,student:current,teacher:admin?.admin??null};
  },
  student:{
   async register(identity){
+   // Known commitment/reload must never pass through the POST rejection handler.
+   // A deliberate same-context retry of a genuinely unknown POST still uses run().
+   if(enrollment.isBlocked())return recoverStudent();
    if(!http.token()&&!enrollment.pending())await http.csrf();
    await enrollment.run(identity,http.token(),async(form,key,csrf)=>{
     const response=await http.send<Profile&{csrf_token:string}>('/student/sessions','POST',{name:form.name,school_id:form.school,form_date:form.date},key,csrf);
     http.rotate(response.csrf_token);return response;
-   });return compose();
+   });
+   const restored=await compose();enrollment.recovered();return restored;
   },
   async signOut(){await http.send('/student/sessions/current','DELETE');current=null;},
-  async refresh(){const restored=await compose();enrollment.recovered();await http.csrf();return restored;},
+  refresh:()=>recoverStudent(),
   async attempt(type){const s=need();let id=s.serverProgress.active_attempt_ids[kind[type]];
    if(!id){const payload={assessment_type:kind[type]};const created=await operations.run(`${s.enrollmentId}:attempt:${type}`,payload,key=>http.send<{attempt_id:string}>('/student/attempts','POST',payload,key));id=created.attempt_id;}
    const a=attemptModel(await http.get<AttemptDto>(`/student/attempts/${id}`),type);s.attempts[type]=a;return a;

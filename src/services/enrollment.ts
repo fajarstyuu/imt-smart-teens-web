@@ -15,6 +15,11 @@ export class EnrollmentOperation {
   }
   pending(){return this.operation?.identity??null;}
   isBlocked(){return this.blocked;}
+  /** A successful POST is not a completed UI operation: required reads may still fail.
+   * Block enrollment writes until authenticated projection + CSRF recovery finishes.
+   * The journal remains credential-free and reload always starts blocked anyway.
+   */
+  committed(){if(this.operation)this.blocked=true;}
   recovered(){this.operation=null;this.originalCsrf=null;this.blocked=false;this.uncertain=false;try{this.storage.removeItem(journalKey);}catch{/* No identity/session is recovered from storage. */}}
   async run<T>(identity:Identity,csrf:string,send:(identity:Identity,key:string,csrf:string)=>Promise<T>):Promise<T>{
     if(this.blocked)throw new Error('Konteks pendaftaran tidak dapat dipastikan setelah muat ulang. Jangan membuat identitas baru. Coba pulihkan sesi tersimpan atau hubungi admin.');
@@ -24,7 +29,7 @@ export class EnrollmentOperation {
       this.operation={identity:normalized,key:crypto.randomUUID()};this.originalCsrf=csrf;
       try{this.storage.setItem(journalKey,JSON.stringify(this.operation));}catch{this.operation=null;throw new Error('Penyimpanan operasi tidak tersedia. Pendaftaran diblokir agar aman saat muat ulang.');}
     }
-    try {const result=await send(this.operation.identity,this.operation.key,this.originalCsrf!);this.recovered();return result;}
+    try {const result=await send(this.operation.identity,this.operation.key,this.originalCsrf!);this.committed();return result;}
     catch(error){
       // Only a definitive INITIAL validation/availability rejection proves no identity committed.
       // A later 4xx/429 says nothing about a previous lost response; never release its key.
