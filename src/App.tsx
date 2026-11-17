@@ -13,6 +13,7 @@ import { SummaryPage } from './pages/SummaryPage';
 import { AdminSchoolsPage } from './pages/AdminSchoolsPage';
 import { TeacherResultsPage } from './pages/TeacherResultsPage';
 import { TeacherLessonsPage, TeacherQuestionsPage } from './pages/TeacherContentPages';
+import {TeacherPublicationPage} from './pages/TeacherPublicationPage';
 import { Brand, Button, ErrorState, LoadingState } from './components/ui';
 import { currentStage, lessonUnlocked, stageUnlocked, stageComplete } from './domain/learning';
 import type { StageId } from './domain/types';
@@ -68,7 +69,7 @@ function StudentRoute({ page }: { page: StudentPage }) {
   return <StudentShell path={['home', 'lesson-list'].includes(page) ? '/beranda' : path} navigate={navigate}>{content}</StudentShell>;
 }
 
-type TeacherPage = 'results' | 'student' | 'lessons' | 'lesson-editor' | 'questions' | 'question-editor' | 'schools';
+type TeacherPage = 'results' | 'student' | 'lessons' | 'lesson-editor' | 'questions' | 'question-editor' | 'schools' | 'publication';
 
 /** Requires an admin session before any CMS or student-result view can mount. */
 function TeacherRoute({ page }: { page: TeacherPage }) {
@@ -77,7 +78,7 @@ function TeacherRoute({ page }: { page: TeacherPage }) {
   const params = useParams();
   if (!data.teacher) return <LoginPage navigate={navigate} teacher returnTo={path}/>;
 
-  const content = page === 'schools' ? <AdminSchoolsPage/> : page === 'lessons' || page === 'lesson-editor'
+  const content = page === 'publication' ? <TeacherPublicationPage navigate={navigate}/> : page === 'schools' ? <AdminSchoolsPage/> : page === 'lessons' || page === 'lesson-editor'
     ? <TeacherLessonsPage editId={page === 'lesson-editor' ? params.editId : undefined} navigate={navigate}/>
     : page === 'questions' || page === 'question-editor'
       ? <TeacherQuestionsPage editId={page === 'question-editor' ? params.editId : undefined} navigate={navigate}/>
@@ -125,6 +126,7 @@ export default function App() {
       <Route path="/ringkasan" element={<StudentRoute page="summary"/>}/>
       <Route path="/app.html" element={<Navigate to="/" replace/>}/>
       <Route path="/admin/masuk" element={<TeacherRoute page="results"/>}/>
+      <Route path="/admin/publikasi" element={<TeacherRoute page="publication"/>}/>
       <Route path="/admin/hasil" element={<TeacherRoute page="results"/>}/>
       <Route path="/admin/hasil/:studentId" element={<TeacherRoute page="student"/>}/>
       <Route path="/admin/materi" element={<TeacherRoute page="lessons"/>}/>

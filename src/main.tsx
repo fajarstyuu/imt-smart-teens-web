@@ -8,4 +8,5 @@ import './styles/tokens.css';
 import './styles/global.css';
 import './styles/student.css';
 import './styles/teacher.css';
+import './styles/cms-workspace.css';
 createRoot(document.getElementById('root')!).render(<BrowserRouter><AppProvider services={api}><App/></AppProvider></BrowserRouter>);

@@ -29,6 +29,7 @@ test('global report picker pages schools and retains an archived off-page select
  await screen.findByRole('option',{name:'Sekolah Arsip (arsip)'});
  expect(screen.getByLabelText('Sekolah laporan')).toHaveProperty('value','historical');
  expect(screen.getByText(/Laporan mencakup seluruh sekolah/)).toBeDefined();
+ await user.click(screen.getByText('Cari sekolah lain & arsip'));
  await user.click(screen.getByRole('button',{name:'Halaman sekolah berikutnya'}));
  await screen.findByRole('option',{name:'Sekolah Terakhir'});
  expect(screen.getByLabelText('Sekolah laporan')).toHaveProperty('value','historical');

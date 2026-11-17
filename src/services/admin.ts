@@ -13,6 +13,7 @@ export const adminApi={
  publishLesson:(id:string,revision:number)=>http.send<LessonEditor>(`/admin/lessons/${id}/publication`,'POST',{expected_revision:revision}),
  archiveLesson:(id:string,revision:number)=>http.send<LessonEditor>(`/admin/lessons/${id}/archive`,'POST',{expected_revision:revision}),
  path:()=>http.get<PathEditor>('/admin/learning-path'),
+ release:(review:{expected_revision:number;lessons:{id:string;expected_revision:number}[];banks:{id:string;expected_revision:number}[]})=>http.send<PathEditor>('/admin/learning-path/release','POST',review),
  order:(ids:string[],revision:number)=>http.send<PathEditor>('/admin/learning-path/order','PUT',{lesson_ids:ids,expected_revision:revision}),
  publishPath:(revision:number)=>http.send<PathEditor>('/admin/learning-path/publication','POST',{expected_revision:revision}),
  banks:()=>http.page<BankEditor>('/admin/question-banks'),

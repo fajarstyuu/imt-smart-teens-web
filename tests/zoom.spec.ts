@@ -8,7 +8,7 @@ import {test,expect,chromium,type BrowserContext,type Page,type Locator} from '@
 import {mkdirSync,mkdtempSync,rmSync,writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {resolve,join} from 'node:path';
-const origin='http://127.0.0.1:5173';
+const origin=process.env.E2E_ORIGIN||'http://127.0.0.1:5173';
 const evidence=resolve('test-results/zoom-evidence');
 async function data(context:BrowserContext,path:string){const r=await context.request.get(origin+'/api/v1'+path);expect(r.status(),`GET ${path}`).toBe(200);return (await r.json()).data;}
 async function reachable(page:Page,control:Locator){
@@ -24,7 +24,7 @@ test('native 200 percent zoom keeps student editor report and error dialog usabl
  await new Promise(resolve=>setTimeout(resolve,61000));mkdirSync(evidence,{recursive:true});
  const profile=mkdtempSync(join(process.env.TMPDIR||tmpdir(),'imt-zoom-'));
  const extension=resolve('tests/support/browser-zoom-extension');
- const context=await chromium.launchPersistentContext(profile,{channel:'chromium',headless:true,viewport:null,baseURL:origin,args:['--window-size=1440,1000',`--disable-extensions-except=${extension}`,`--load-extension=${extension}`]}).catch(error=>{rmSync(profile,{recursive:true,force:true});throw error;});
+ const context=await chromium.launchPersistentContext(profile,{channel:'chromium',executablePath:process.env.RG_CHROME_PATH||undefined,headless:true,viewport:null,baseURL:origin,args:['--window-size=1440,1000',`--disable-extensions-except=${extension}`,`--load-extension=${extension}`]}).catch(error=>{rmSync(profile,{recursive:true,force:true});throw error;});
  const page=context.pages()[0]??await context.newPage();const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
  const worker=context.serviceWorkers()[0]??await context.waitForEvent('serviceworker');
  // This worker has one app tab. No tabs/host/debugger permission is requested.
@@ -63,19 +63,19 @@ test('native 200 percent zoom keeps student editor report and error dialog usabl
   await reachable(page,page.locator('.answer-option input').first());await page.keyboard.press('Space');await expect(page.locator('.save-status')).toContainText('Jawaban tersimpan');
   await reachable(page,button(page,'Berikutnya'));await page.keyboard.press('Enter');await expect(page.getByRole('heading',{name:'Pre-test',exact:true})).toBeVisible();await capture('student-200');await capture('student-actions-200','bottom');
   // Real CMS editor, including scroll-to-field and keyboard-save at native zoom.
-  await page.goto('/admin/materi/baru');await zoom(2);const title=page.getByLabel('Judul materi',{exact:false});await reachable(page,title);await title.fill('Materi sintetis zoom '+Date.now().toString(36));await page.getByLabel('Judul bagian 1',{exact:true}).fill('Bagian yang dapat dibaca');const body=page.getByLabel('Isi materi 1',{exact:true});await reachable(page,body);await body.fill('Teks materi sintetis untuk pemeriksaan zoom browser dua ratus persen.');
+  await page.goto('/admin/materi/baru');await zoom(2);const title=page.getByLabel('Judul materi',{exact:false});await reachable(page,title);await title.fill('Materi sintetis zoom '+Date.now().toString(36));const body=page.getByLabel('Isi materi',{exact:true});await reachable(page,body);await body.fill('Teks materi sintetis untuk pemeriksaan zoom browser dua ratus persen.');
   await reachable(page,button(page,'Simpan draf'));await page.keyboard.press('Enter');await expect(page).toHaveURL(/\/admin\/materi\/[a-f\d-]{36}$/);const lessonId=new URL(page.url()).pathname.split('/').pop()!;await capture('editor-200');await reachable(page,page.getByLabel('Judul materi',{exact:false}));await capture('editor-fields-200','current');await capture('editor-actions-200','bottom');
   // Real scoped report + stored answer detail (not a fabricated table).
   await page.goto('/admin/hasil?school_id='+school.id);await zoom(2);const details=button(page,'Lihat hasil '+name);await reachable(page,details);await page.keyboard.press('Enter');await reachable(page,button(page,'Lihat jawaban Pre-test'));await page.keyboard.press('Enter');await expect(page.locator('.student-answers')).toContainText('Pilihan pertama sintetis');await capture('report-200');await capture('report-answers-200','bottom');
   // The active confirmation receives a real backend409, so alert and both actions
   // must remain reachable within the zoomed, possibly scrollable dialog.
-  await page.goto('/admin/materi/'+lessonId);await zoom(2);await button(page,'Arsipkan materi').click();await expect(page.getByRole('dialog')).toBeVisible();
+  await page.goto('/admin/materi/'+lessonId);await zoom(2);if(!(await button(page,'Arsipkan materi').isVisible()))await page.getByText('Pengaturan lanjutan',{exact:true}).click();await button(page,'Arsipkan materi').click();await expect(page.getByRole('dialog')).toBeVisible();
   const lesson=await data(context,'/admin/lessons/'+lessonId),token=await data(context,'/csrf');
   const concurrent=await context.request.put(origin+'/api/v1/admin/lessons/'+lessonId,{headers:{Origin:origin,'X-CSRF-Token':token.token},data:{...lesson.draft,position:lesson.position,expected_revision:lesson.revision}});expect(concurrent.status()).toBe(200);
   await reachable(page,button(page,'Ya, arsipkan'));await page.keyboard.press('Enter');const alert=page.getByRole('dialog').getByRole('alert');await expect(alert).toBeVisible();await capture('dialog-error-200','current');
   await reachable(page,button(page,'Kembali'));await page.keyboard.press('Tab');await expect(page.getByRole('dialog')).toBeVisible();await page.keyboard.press('Escape');await expect(page.getByRole('dialog')).not.toBeVisible();await expect(button(page,'Arsipkan materi')).toBeFocused();
   // Explicit cleanup of our synthetic draft via the UI; no destructive DB reset.
-  await button(page,'Muat revisi terbaru').click();await expect(page.getByRole('status').filter({hasText:'Revisi dan posisi terbaru dimuat'})).toBeVisible();await button(page,'Arsipkan materi').click();await button(page,'Ya, arsipkan').click();await expect(button(page,'Simpan draf')).toBeDisabled();expect((await data(context,'/admin/lessons/'+lessonId)).state).toBe('archived');
+  await button(page,'Muat revisi terbaru').click();await expect(page.getByRole('status').filter({hasText:'Revisi dan posisi terbaru dimuat'})).toBeVisible();if(!(await button(page,'Arsipkan materi').isVisible()))await page.getByText('Pengaturan lanjutan',{exact:true}).click();await button(page,'Arsipkan materi').click();await button(page,'Ya, arsipkan').click();await expect(button(page,'Simpan draf')).toBeDisabled();expect((await data(context,'/admin/lessons/'+lessonId)).state).toBe('archived');
   expect(errors).toEqual([]);
   await zoom(1);expect((await zoom()).factor).toBe(1);records.push({screen:'reset-100-percent',zoom:await zoom(),...await metrics()});
   writeFileSync(resolve(evidence,'metrics.json'),JSON.stringify({browser:context.browser()?.version(),method:'chrome.tabs.setZoom automatic per-tab; getZoom readback',records,interactions:['student keyboard answer/save/next','editor scroll/fill/keyboard-save','report keyboard detail/answer','real409 dialog keyboard actions/Escape/focus restoration'],pageErrors:errors},null,2));
