@@ -1,0 +1,52 @@
+import {afterEach,expect,test,vi} from 'vitest';
+import {cleanup,render,screen,waitFor,within} from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import {MemoryRouter} from 'react-router-dom';
+import {AppProvider} from '../src/hooks/useApp';
+import {TeacherShell} from '../src/components/TeacherShell';
+import {TeacherResultsPage} from '../src/pages/TeacherResultsPage';
+import {adminApi} from '../src/services/admin';
+import type {AppServices} from '../src/services/contracts';
+import type {School} from '../src/services/dto';
+const services={bootstrap:async()=>({config:{brand:'Imt Smart Teens',program:'Gizi',mode:'development'},student:null,teacher:{id:'a',name:'Admin',email:'',can_manage_schools:false,can_manage_content:false,school_ids:[]}})} as AppServices;
+afterEach(()=>{cleanup();vi.restoreAllMocks();});
+const row=(id:string,name:string,status:'active'|'archived'='active'):School=>({id,name,status,revision:1,created_at:'',updated_at:'',archived_at:status==='archived'?'2026-11-17T00:00:00Z':null});
+const page=(data:School[],offset=0,total=data.length)=>({data,meta:{limit:25,offset,total}});
+function reports(url='/admin/hasil'){render(<MemoryRouter initialEntries={[url]}><AppProvider services={services}><TeacherResultsPage navigate={()=>{}}/></AppProvider></MemoryRouter>);}
+test('global admin navigation ignores inert legacy flags',async()=>{
+ render(<AppProvider services={services}><TeacherShell path="/admin/hasil" navigate={()=>{}}>Content</TeacherShell></AppProvider>);
+ await screen.findByText('Admin',{selector:'.teacher-account span'});
+ const nav=within(screen.getByRole('navigation',{name:'Navigasi admin'}));
+ for(const name of ['Hasil siswa','Materi','Bank soal','Sekolah'])expect(nav.getByRole('button',{name})).toBeDefined();
+});
+test('global report picker pages schools and retains an archived off-page selection and other filters',async()=>{
+ const user=userEvent.setup();const selected=row('historical','Sekolah Arsip','archived');
+ const rows=Array.from({length:25},(_,i)=>row('s'+i,'Sekolah '+i));
+ const schools=vi.spyOn(adminApi,'schools').mockImplementation(async(q='',status='active',offset=0)=>status==='archived'?page([selected]):q?page([row('new','Sekolah Baru')]):offset===25?page([row('last','Sekolah Terakhir')],25,26):page(rows,0,26));
+ vi.spyOn(adminApi,'school').mockResolvedValue(selected);
+ const students=vi.spyOn(adminApi,'students').mockResolvedValue({data:[],meta:{limit:25,offset:0,total:0}});
+ reports('/admin/hasil?school_id=historical&stage=lessons');
+ await screen.findByRole('option',{name:'Sekolah Arsip (arsip)'});
+ expect(screen.getByLabelText('Sekolah laporan')).toHaveProperty('value','historical');
+ expect(screen.getByText(/Laporan mencakup seluruh sekolah/)).toBeDefined();
+ await user.click(screen.getByRole('button',{name:'Halaman sekolah berikutnya'}));
+ await screen.findByRole('option',{name:'Sekolah Terakhir'});
+ expect(screen.getByLabelText('Sekolah laporan')).toHaveProperty('value','historical');
+ await user.selectOptions(screen.getByLabelText('Status sekolah laporan'),'archived');
+ await screen.findByRole('option',{name:'Sekolah Arsip (arsip)'});
+ await user.selectOptions(screen.getByLabelText('Sekolah laporan'),'');
+ await waitFor(()=>expect(students).toHaveBeenLastCalledWith(expect.objectContaining({school_id:'',stage:'lessons'}),0));
+ expect(schools).toHaveBeenCalledWith('','all',25);
+ expect(schools).toHaveBeenCalledWith('','archived',0);
+});
+test('global school picker read failure retries without clearing URL selection',async()=>{
+ vi.spyOn(adminApi,'students').mockResolvedValue({data:[],meta:{limit:25,offset:0,total:0}});
+ const schools=vi.spyOn(adminApi,'schools').mockRejectedValueOnce(Error('Katalog belum tersedia.')).mockResolvedValue(page([row('chosen','Sekolah Pilihan')]));
+ vi.spyOn(adminApi,'school').mockResolvedValue(row('chosen','Sekolah Pilihan'));
+ reports('/admin/hasil?school_id=chosen');
+ await screen.findByText('Katalog belum tersedia.');
+ await userEvent.click(screen.getByRole('button',{name:/Coba lagi/}));
+ await screen.findByRole('option',{name:'Sekolah Pilihan'});
+ expect(screen.getByLabelText('Sekolah laporan')).toHaveProperty('value','chosen');
+ expect(schools).toHaveBeenCalledTimes(2);
+});

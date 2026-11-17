@@ -9,7 +9,7 @@ import {ReadState,Pager,Select,History} from '../components/AdminControls';
 import {LessonEditor,QuestionEditor} from '../components/ContentEditors';
 import type {LessonEditor as LessonDto} from '../services/dto';
 export function TeacherLessonsPage({editId,navigate}:{editId?:string;navigate:(path:string)=>void}){
- const {data}=useApp();if(!data.teacher?.can_manage_content)return <ErrorState message="Tidak memiliki izin mengelola konten."/>;
+ const {data}=useApp();if(!data.teacher)return <ErrorState message="Tidak memiliki izin mengelola konten."/>;
  return editId?<LessonRoute key={editId} id={editId} navigate={navigate}/>:<LessonCatalog navigate={navigate}/>;
 }
 function LessonRoute({id,navigate}:{id:string;navigate:(p:string)=>void}){
@@ -28,7 +28,7 @@ function PathPanel({lessons}:{lessons:LessonDto[]}){
  return <section className="path-panel"><h2>Jalur belajar & publikasi</h2><p>Publikasi jalur memakai versi terbit terbaru dari setiap materi dan kedua bank, bukan draf yang belum terbit. Pendaftaran baru memakai jalur ini.</p><ReadState loading={model.loading} error={model.error} retry={model.reload}/>{notice&&<p role="status">{notice}</p>}{action.error&&<ErrorState message={action.error}/>}{path&&<><p>Revisi jalur {path.revision} · {path.published?`Versi terbit ${path.published.version}`:'Belum terbit'}</p><ol className="path-order">{path.lesson_ids.map((id,i)=><li key={id}><span>{lessons.find(l=>l.id===id)?.draft.title??id}</span><Button variant="ghost" aria-label={`Naikkan materi ${i+1}`} disabled={action.busy||i===0} onClick={()=>move(i,-1)}>Naik</Button><Button variant="ghost" aria-label={`Turunkan materi ${i+1}`} disabled={action.busy||i===path.lesson_ids.length-1} onClick={()=>move(i,1)}>Turun</Button></li>)}</ol>{banks.data?.data.map(bank=><p key={bank.id}>Bank {bank.kind} · versi terbit {bank.versions[0]?.version??'belum ada'} · revisi draf {bank.revision}</p>)}<Button variant="secondary" disabled={action.busy} onClick={()=>{model.reload();banks.reload();}}>Muat metadata publikasi terbaru</Button><Button busy={action.busy} onClick={()=>void action.run(async()=>{model.setData(await adminApi.publishPath(path.revision));setNotice('Jalur belajar diterbitkan.');})}>Terbitkan jalur belajar</Button><History versions={path.versions}/>{path.published&&<details><summary>Manifest jalur terbit</summary><p>Bank berpasangan: {path.published.paired_bank_version_id}</p><p>Bank quiz: {path.published.quiz_bank_version_id}</p>{path.published.lessons.map(l=><p key={l.lesson_id}>{l.position}. {l.lesson_id} · {l.lesson_version_id}</p>)}</details>}</>}</section>;
 }
 export function TeacherQuestionsPage({editId,navigate}:{editId?:string;navigate:(p:string)=>void}){
- const {data}=useApp();const {bankId}=useParams();if(!data.teacher?.can_manage_content)return <ErrorState message="Tidak memiliki izin mengelola konten."/>;
+ const {data}=useApp();const {bankId}=useParams();if(!data.teacher)return <ErrorState message="Tidak memiliki izin mengelola konten."/>;
  return editId&&bankId?<QuestionRoute key={`${bankId}:${editId}`} bank={bankId} id={editId} navigate={navigate}/>:<QuestionCatalog navigate={navigate}/>;
 }
 function QuestionRoute({bank,id,navigate}:{bank:string;id:string;navigate:(p:string)=>void}){

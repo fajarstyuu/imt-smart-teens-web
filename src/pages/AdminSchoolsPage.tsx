@@ -7,7 +7,7 @@ import type {School} from '../services/dto';
 import {Button,ConfirmDialog,ErrorState,Field,StatusBadge,useAction} from '../components/ui';
 import {Pager,ReadState,Select} from '../components/AdminControls';
 export function AdminSchoolsPage(){
- const {data}=useApp();if(!data.teacher?.can_manage_schools)return <ErrorState message="Tidak memiliki izin mengelola katalog sekolah."/>;
+ const {data}=useApp();if(!data.teacher)return <ErrorState message="Tidak memiliki izin mengelola katalog sekolah."/>;
  return <SchoolCatalog/>;
 }
 function SchoolCatalog(){

@@ -7,9 +7,10 @@ import {adminApi} from '../src/services/admin';
 import type {AppServices} from '../src/services/contracts';
 afterEach(()=>{cleanup();vi.restoreAllMocks();});
 const services=(allowed:boolean)=>({bootstrap:async()=>({config:{brand:'Imt Smart Teens',program:'Gizi',mode:'development'},student:null,teacher:{id:'a',name:'Admin',email:'',can_manage_schools:allowed,can_manage_content:false,school_ids:[]}})}) as AppServices;
-test('school-catalog permission does not imply access; denied UI makes no catalog calls',async()=>{
- const list=vi.spyOn(adminApi,'schools');render(<AppProvider services={services(false)}><AdminSchoolsPage/></AppProvider>);
- await screen.findByText(/Tidak memiliki izin/);expect(list).not.toHaveBeenCalled();
+test('active global admin can manage schools despite inert legacy permission flags',async()=>{
+ const list=vi.spyOn(adminApi,'schools').mockResolvedValue({data:[],meta:{limit:25,offset:0,total:0}});render(<AppProvider services={services(false)}><AdminSchoolsPage/></AppProvider>);
+ await screen.findByRole('button',{name:'Tambah sekolah'});await waitFor(()=>expect(list).toHaveBeenCalled());
+ expect(screen.queryByText(/Tidak memiliki izin/)).toBeNull();
 });
 test('school create 409 preserves name and archive requires confirmation',async()=>{
  const row={id:'school',name:'Sekolah',revision:1,status:'active',created_at:'',updated_at:'',archived_at:null} as const;

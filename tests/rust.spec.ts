@@ -1,9 +1,8 @@
 /** Real Rust/PostgreSQL acceptance. No fixture server, database resets or teaching SQL.
- * Operator provides E2E_PRIVATE_ENV and optionally E2E_GRANT_HELPER for the owned synthetic DB.
+ * Operator provides E2E_PRIVATE_ENV for the owned synthetic DB.
  * Credentials are loaded only in the Node worker and injected via its request context.
  */
 import {test,expect,type BrowserContext,type Page} from '@playwright/test';
-import {execFileSync} from 'node:child_process';
 import {mkdirSync} from 'node:fs';
 import {resolve} from 'node:path';
 const origin='http://127.0.0.1:5173';
@@ -61,15 +60,14 @@ test('real CMS publications, full student journey, scoped historical reporting a
  mkdirSync(evidence,{recursive:true});
  const admin=await browser.newContext({baseURL:origin,viewport:{width:1440,height:1000}});await login(admin);
  const page=await admin.newPage();const errors:string[]=[];const urls:string[]=[];
- const observe=(p:Page)=>{p.on('pageerror',e=>errors.push(e.message));p.on('console',m=>{if(m.type()==='error'&&!m.text().includes('401')&&!m.text().includes('403')&&!m.text().includes('409'))errors.push(m.text());});p.on('request',r=>{urls.push(r.url());expect(r.headers().authorization).toBeUndefined();});};observe(page);
+ const observe=(p:Page)=>{p.on('pageerror',e=>errors.push(e.message));p.on('console',m=>{const favicon=m.location().url===origin+'/favicon.ico'&&m.text().includes('404');if(favicon){console.log('Baseline development-only favicon404 observed (no API failure)');return;}if(m.type()==='error'&&!m.text().includes('401')&&!m.text().includes('403')&&!m.text().includes('409'))errors.push(m.text());});p.on('response',response=>{if(response.status()===404)console.log('Observed 404 path',new URL(response.url()).pathname);});p.on('request',r=>{urls.push(r.url());expect(r.headers().authorization).toBeUndefined();});};observe(page);
  const initialLessons=await data(admin,'/admin/lessons?limit=25&offset=0');const banks=await data(admin,'/admin/question-banks');const initialPath=await data(admin,'/admin/learning-path');
  console.log('Real CMS initial state',{lessons:initialLessons.length,banks:banks.length,pathPublished:!!initialPath.published});
  const suffix=Date.now().toString(36),schoolName=`Sekolah sintetis UI ${suffix}`;
  await page.goto('/admin/sekolah');await expect(page.getByRole('heading',{name:'Sekolah',exact:true})).toBeVisible();
  await click(page,'Tambah sekolah');await page.getByLabel('Nama sekolah',{exact:false}).fill(schoolName);
  const created=page.waitForResponse(r=>r.url().endsWith('/api/v1/admin/schools')&&r.request().method()==='POST');await click(page,'Simpan sekolah');const schoolResponse=await created;expect(schoolResponse.status()).toBe(201);const school=(await schoolResponse.json()).data;
- if(!process.env.E2E_GRANT_HELPER)throw Error('Operator must supply E2E_GRANT_HELPER to grant the new synthetic school to this admin.');
- execFileSync('python3',[process.env.E2E_GRANT_HELPER,school.id],{stdio:'pipe'});
+ // Every active admin sees new schools immediately without grant mutations.
  await page.reload();await page.getByLabel('Cari sekolah',{exact:true}).fill(schoolName);await expect(page.getByText(schoolName,{exact:true})).toBeVisible();
  await capture(page,'admin-schools-desktop.png');await page.setViewportSize({width:360,height:1000});await noOverflow(page);await capture(page,'admin-schools-360.png');await page.setViewportSize({width:1440,height:1000});
  // Author via browser CMS. On retries, inspect and reuse this test's already-authored drafts, never wipe data.
@@ -206,11 +204,11 @@ test('coexisting admin/student cookies restore independently, enforce ownership 
  await context.close();
 });
 
-test('catalog/content administration does not grant reporting scope for a new school',async({browser})=>{
+test('global admin immediately reads a new school without a grant or re-login',async({browser})=>{
  const admin=await browser.newContext({baseURL:origin});await login(admin);const csrf=await data(admin,'/csrf');const schoolResponse=await admin.request.post('/api/v1/admin/schools',{headers:{Origin:origin,'X-CSRF-Token':csrf.token},data:{name:`Sekolah tanpa cakupan ${Date.now().toString(36)}`}});expect(schoolResponse.status()).toBe(201);const school=(await schoolResponse.json()).data;
  const student=await browser.newContext({baseURL:origin});const page=await student.newPage();await enrollmentForm(page,school,'Siswa sintetis outside reporting scope');await click(page,'Mulai pre-test');await expect(page.getByRole('heading',{name:'Pre-test',exact:true})).toBeVisible();const profile=await data(student,'/student/me');
- expect((await admin.request.get('/api/v1/admin/students?school_id='+school.id)).status()).toBe(403);expect((await admin.request.get(`/api/v1/admin/students/${profile.student.id}/results?enrollment_id=${profile.enrollment.id}`)).status()).toBe(404);
- const view=await admin.newPage();await view.goto('/admin/hasil?school_id='+school.id);await expect(view.getByRole('alert')).toBeVisible();expect(await view.locator('.data-table tbody tr').count()).toBe(0);await admin.close();await student.close();
+ expect((await admin.request.get('/api/v1/admin/students?school_id='+school.id)).status()).toBe(200);expect((await admin.request.get(`/api/v1/admin/students/${profile.student.id}/results?enrollment_id=${profile.enrollment.id}`)).status()).toBe(200);
+ const view=await admin.newPage();await view.goto('/admin/hasil?school_id='+school.id);await expect(view.locator('.data-table tbody tr')).toHaveCount(1);await expect(view.getByRole('option',{name:school.name,exact:true})).toBeAttached();await expect(view.getByLabel('Sekolah laporan',{exact:true})).toHaveValue(school.id);await capture(view,'global-admin-new-school-desktop.png');await view.setViewportSize({width:390,height:844});await noOverflow(view);await capture(view,'global-admin-new-school-mobile.png');await admin.close();await student.close();
 });
 test('real revision conflict preserves CMS input; draft archive confirms and preserves history',async({browser})=>{
  const context=await browser.newContext({baseURL:origin});await login(context);const lesson=(await data(context,'/admin/lessons?limit=25&offset=0'))[0];const page=await context.newPage();await page.goto('/admin/materi/'+lesson.id);await page.getByLabel('Deskripsi',{exact:true}).fill('Draf lokal dipertahankan setelah konflik nyata.');

@@ -1,6 +1,6 @@
 # Imt Smart Teens
 
-React + TypeScript frontend for the reviewed Rust v1 API. The Indonesian UI preserves the existing Editorial Campus palette, typography, photography, clean BrowserRouter URLs and legacy hash redirects. Student views use public pinned content only; admin editors and scoped historical reports are separate views.
+React + TypeScript frontend for the reviewed Rust v1 API. The Indonesian UI preserves the existing Editorial Campus palette, typography, photography, clean BrowserRouter URLs and legacy hash redirects. Student views use public pinned content only; admin editors and global historical reports are separate views.
 
 ## Production containers and domains
 
@@ -49,7 +49,7 @@ The build type-checks, emits `dist/app.html`, and publishes the SPA entry as `in
 
 ## Admin content, schools and reports
 
-- No public default admin account exists. An operator provisions an admin privately in Rust and separately assigns school reporting grants. Content and school-catalog permissions do not imply access to student reports.
+- No public default admin account exists. An operator seeds an admin privately in Rust. Every active admin has global school/content/report access, including future and archived schools; legacy booleans/grant rows are not authorization gates. Report school selection uses bounded searchable catalog pages and preserves URL filters.
 - Bounded lists and selected detail screens cover lessons, the paired pre/post and quiz banks, schools, enrollment summaries and historical answers. Editors use stable draft section/option UUIDs and expected root revisions. Draft save, lesson/bank publication and path publication are distinct actions. Path order is explicit, archives confirm and preserve history, and revision conflicts retain entered values.
 - “Muat revisi terbaru” updates the acknowledged server baseline/revision, not the visible local form. If they differ (even a previously clean form), the lesson is unsaved and publication is disabled until the admin deliberately saves the visible content. Save errors/refresh never erase dirty input; a successful save displays its acknowledged server draft. Each mounted editor owns its own guard, so saving another editor cannot clear it.
 - Published option IDs differ from draft option IDs. Student snapshots remain pinned across subsequent CMS edits/publications/archive. Editorial content is plain text rendered with escaped React text nodes, never HTML injection.
@@ -64,15 +64,14 @@ npm run build
 npx playwright install chromium
 # Paths below are operator-supplied PRIVATE files, not files in this repo:
 E2E_PRIVATE_ENV=/path/to/private/synthetic-runtime.env \
-E2E_GRANT_HELPER=/path/to/operator/synthetic-school-grant.py \
 npm run test:e2e
 ```
 
 `E2E_PRIVATE_ENV` supplies generated `ADMIN_EMAIL` and `ADMIN_PASSWORD` to the **Node test worker only**. Login is injected with Playwright's Node request context, never browser environment/storage, URLs, committed files or screenshots. Traces/video/automatic screenshots are disabled to avoid authentication artifacts. Explicit screenshots show only post-authentication synthetic data or empty login forms.
 
-`E2E_GRANT_HELPER` is an optional operator-owned Python helper required by the school-creation/reporting test. Its sole argument is the canonical UUID of the new synthetic school. A portable equivalent must be hard-bound to the owned synthetic DB and test admin, assign only that school's reporting grant, and verify the assignment. It must not create teaching data, answers, scores or progress; no public UI calls it. No absolute helper path or secret is committed here.
+The browser suite requires no reporting-grant helper. Its new-school case proves global access in the existing admin session, without grant mutation or re-login.
 
-The browser suite uses the real already-running Rust API/PostgreSQL and one Chromium worker. It authors teaching content through the actual CMS UI, creates a synthetic school, enrolls/completes a student, republishes after enrollment to prove old snapshots, verifies reports against an explicitly selected historical version, exercises response loss/refresh/fail-closed enrollment, role coexistence/ownership/target logout, school scope denial, real revision conflicts and confirmed archive. It checks clean/hash routes, denied localStorage, reduced motion, keyboard forms/dialogs and360/768/1024/1440px layouts. Actual screenshots are written to ignored `test-results/evidence`.
+The browser suite uses the real already-running Rust API/PostgreSQL and one Chromium worker. It authors teaching content through the actual CMS UI, creates a synthetic school, enrolls/completes a student, republishes after enrollment to prove old snapshots, verifies reports against an explicitly selected historical version, exercises response loss/refresh/fail-closed enrollment, role coexistence/ownership/target logout, immediate global access to a newly created school, real revision conflicts and confirmed archive. It checks clean/hash routes, denied localStorage, reduced motion, keyboard forms/dialogs and360/768/1024/1440px layouts. Actual screenshots are written to ignored `test-results/evidence`.
 
 The active Rust suite also covers lost answer acknowledgement -> canceled menu/Back/logout -> actual revision409 -> deliberate retry -> persisted restore; clean/dirty two-editor lesson refresh -> blocked publication -> deliberate save -> pinned published text/sections readback; and dirty lesson/question fragment Back, repeated/multi-step rollback, canceled/accepted logout with session readback, and coherent accepted Back/Forward. Keep the navigation dispatcher registered before BrowserRouter subscribes: Chromium invokes listeners at the window event target in registration order, so adding a capture listener later is insufficient.
 
@@ -84,7 +83,7 @@ The native browser-zoom gate runs **separately and sequentially** after the main
 E2E_PRIVATE_ENV=/path/to/private/synthetic-runtime.env npm run test:e2e:zoom
 ```
 
-It uses full bundled Chromium (`channel: 'chromium'`), a private temporary persistent profile, and a permission-free MV3 test extension calling Chrome's native `tabs.setZoom(2)` in **automatic per-tab** mode. `getZoom`/settings readback and real layout/DPR metrics prove browser-owned 200% scaling (not CSS zoom, pinch, narrow viewport or device-scale-only emulation). The profile is deleted and zoom reset to1 on cleanup. Student answer/save/next, editor keyboard-save, scoped report details and a real409 confirmation dialog are exercised. Explicit CDP surface screenshots, without a clip/viewport override, and non-auth metrics are saved under ignored `test-results/zoom-evidence`; Playwright full-page clipping is not used for these zoom captures. Primary API/runner references are documented in `tests/zoom.spec.ts`. No standalone screen-reader audit is implied.
+It uses full bundled Chromium (`channel: 'chromium'`), a private temporary persistent profile, and a permission-free MV3 test extension calling Chrome's native `tabs.setZoom(2)` in **automatic per-tab** mode. `getZoom`/settings readback and real layout/DPR metrics prove browser-owned 200% scaling (not CSS zoom, pinch, narrow viewport or device-scale-only emulation). The profile is deleted and zoom reset to1 on cleanup. Student answer/save/next, editor keyboard-save, historical report details and a real409 confirmation dialog are exercised. Explicit CDP surface screenshots, without a clip/viewport override, and non-auth metrics are saved under ignored `test-results/zoom-evidence`; Playwright full-page clipping is not used for these zoom captures. Primary API/runner references are documented in `tests/zoom.spec.ts`. No standalone screen-reader audit is implied.
 
 On minimal Linux hosts, Chromium may need shared libraries. Without authorization to install host packages, download/extract dependencies to a private scratch directory and set `LD_LIBRARY_PATH` **only for the test command**. Do not use privileged OS installs. The Task4 report records exact execution evidence and any environment-specific paths; they are not portable setup requirements.
 
