@@ -12,7 +12,7 @@
 - `src/components/MeasurementPhoto.tsx`: one shared source updates student/admin sign-in and the learning home; Indonesian alt text describes an illustration. The printed52.3kg is artwork, never application data. Existing optional caption and eager image priority remain.
 - `src/styles/student.css`: correct image aspect ratio and `object-fit:contain`; no other layout or responsive policy change.
 - `tests/measurement-image.test.tsx`: actual component source/dimensions/alt/caption, exact input hash and absence of a fake textual measurement.
-- Generated `index.html` changes only with the production build.
+- Generated `index.html` changes only with the production build. `assets/illustrations/measurement-scale-0da8acfb.jpg` is the matching generated root publishing copy, tracked like the existing stock image; it must match the public source bytes. The clean-checkout gate caught this new generated directory before any live mutation; it was retained rather than ignored or silently deleted.
 
 ## Verification and acceptance
 
