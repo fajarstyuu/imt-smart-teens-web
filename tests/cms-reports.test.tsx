@@ -45,4 +45,3 @@ for(const delayed of [false,true])test(`same-student enrollment navigation reset
  await userEvent.click(screen.getByRole('button',{name:'Lihat jawaban Pre-test',exact:true}));await screen.findByText('Jawaban pendaftaran kedua');
  expect(answers.mock.calls.map(([attempt])=>attempt)).toEqual(['first-attempt','second-attempt']);
 });
-
