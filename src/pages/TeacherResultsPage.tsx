@@ -12,7 +12,12 @@ import type {Page} from '../services/http';
 const names:Record<string,string>={pre_test:'Pre-test',quiz:'Quiz',post_test:'Post-test',lessons:'Materi',calculator:'Kalkulator IMT',completed:'Selesai'};
 const states:Record<string,string>={not_started:'Belum mengerjakan',unanswered:'Belum dijawab',answered:'Terjawab · belum dinilai',incorrect:'Salah',correct:'Benar'};
 const showScore=(value:number|null|undefined)=>value===null||value===undefined?'Belum':`${value}/100`;
-export function TeacherResultsPage({selectedId,navigate}:{selectedId?:string;navigate:(p:string)=>void}){return selectedId?<StudentDetail key={selectedId} id={selectedId} navigate={navigate}/>:<Reports navigate={navigate}/>;}
+export function TeacherResultsPage({selectedId,navigate}:{selectedId?:string;navigate:(p:string)=>void}){
+ const [params]=useSearchParams();
+ // Enrollment is part of report identity: remount all tab/attempt/page state together,
+ // so a late answer read for another enrollment cannot appear under the new heading.
+ return selectedId?<StudentDetail key={`${selectedId}:${params.get('enrollment_id')??''}`} id={selectedId} navigate={navigate}/>:<Reports navigate={navigate}/>;
+}
 function Reports({navigate}:{navigate:(p:string)=>void}){
  const [params,setParams]=useSearchParams();const tab=params.get('tab')??'students';const [offset,setOffset]=useState(0),[filterError,setFilterError]=useState('');
  const fields=['q','school_id','form_date_from','form_date_to','submitted_from','submitted_to','stage','assessment_type'] as const;
@@ -46,13 +51,17 @@ function EditorVersionPicker({selected,onChange}:{selected:{question_id:string;q
 function StudentDetail({id,navigate}:{id:string;navigate:(p:string)=>void}){
  const [params]=useSearchParams(),enrollment=params.get('enrollment_id')??'';const candidate=params.get('return_to')??'';const returnTo=candidate.startsWith('/admin/hasil?')&&!candidate.includes('\\')?candidate:'/admin/hasil';
  const model=useResource(()=>adminApi.results(id,enrollment),[id,enrollment]);const [tab,setTab]=useState('summary'),[attempt,setAttempt]=useState(''),[offset,setOffset]=useState(0);
- const answers=useResource(()=>attempt?adminApi.answers(attempt,offset):Promise.resolve(null),[attempt,offset]);const result=model.data;
+ const result=model.data;
+ // Never request or render an attempt until the current enrollment's committed result
+ // explicitly owns it. This also protects refresh/loading boundaries within one identity.
+ const selectedAttempt=result?.attempts.find(a=>a.id===attempt);
+ const answers=useResource(()=>selectedAttempt?adminApi.answers(selectedAttempt.id,offset):Promise.resolve(null),[selectedAttempt?.id,result?.enrollment.id,offset]);
  const openAnswers=(id:string)=>{answers.setData(null);setAttempt(id);setOffset(0);setTab('answers');};
  const attemptFor=(kind:string):AttemptSummary|undefined=>result?.attempts.find(a=>a.assessment_type===kind&&a.status==='submitted')??result?.attempts.find(a=>a.assessment_type===kind);
  return <><Button variant="ghost" onClick={()=>navigate(returnTo)}>Kembali ke hasil siswa</Button><ReadState loading={model.loading} error={model.error} retry={model.reload}/>{result&&<><div className="teacher-page-heading"><div><span className="eyebrow">DETAIL HASIL SISWA</span><h1>{result.student.name}</h1><p>{result.enrollment.school_name_at_enrollment} · Daftar {formatCalendarDate(result.enrollment.form_date)} · {names[result.current_stage]}</p></div></div>
  <div className="content-tabs" role="tablist" aria-label="Detail hasil siswa">{[['summary','Ringkasan'],['answers','Jawaban asesmen'],['activity','Aktivitas belajar'],['measurements','Pengukuran IMT']].map(([key,label])=><button role="tab" type="button" aria-selected={tab===key} key={key} onClick={()=>setTab(key)}>{label}</button>)}</div>
  {tab==='summary'&&<><dl className="cms-scoreline">{['pre_test','quiz','post_test'].map(kind=>{const a=attemptFor(kind);return <div key={kind}><dt>{names[kind]}</dt><dd>{a?.score_percent===null||a?.score_percent===undefined?'—':`${a.score_percent}/100`}</dd><p>{!a?'Belum mengerjakan':a.status==='submitted'?'Selesai':'Sedang dikerjakan'}</p>{a&&<><time className="cms-date">{formatAdminTimestamp(a.submitted_at)}</time><Button variant="ghost" onClick={()=>openAnswers(a.id)}>Lihat jawaban {names[kind]}</Button></>}</div>;})}</dl><p className="cms-note">Buka tab untuk memeriksa jawaban, aktivitas, atau pengukuran tanpa menumpuk seluruh riwayat di satu layar.</p></>}
- {tab==='answers'&&<section><Select id="student-attempt" label="Asesmen siswa" value={attempt} onChange={openAnswers}><option value="">Pilih asesmen</option>{result.attempts.map(a=><option key={a.id} value={a.id}>{names[a.assessment_type]} · percobaan {a.attempt_number} · {a.status==='submitted'?'Selesai':'Sedang dikerjakan'}</option>)}</Select>{!attempt&&<p className="cms-note">Pilih asesmen yang ingin diperiksa.</p>}<ReadState loading={answers.loading&&!!attempt} error={answers.error} retry={answers.reload}/>{answers.data&&<AnswerPage page={answers.data} offset={offset} onOffset={setOffset}/>}</section>}
+ {tab==='answers'&&<section><Select id="student-attempt" label="Asesmen siswa" value={attempt} onChange={openAnswers}><option value="">Pilih asesmen</option>{result.attempts.map(a=><option key={a.id} value={a.id}>{names[a.assessment_type]} · percobaan {a.attempt_number} · {a.status==='submitted'?'Selesai':'Sedang dikerjakan'}</option>)}</Select>{!attempt&&<p className="cms-note">Pilih asesmen yang ingin diperiksa.</p>}<ReadState loading={answers.loading&&!!attempt} error={answers.error} retry={answers.reload}/>{selectedAttempt&&answers.data&&<AnswerPage page={answers.data} offset={offset} onOffset={setOffset}/>}</section>}
  {tab==='activity'&&<section className="cms-panel cms-editor-body"><h2>Aktivitas belajar</h2>{result.lessons.length?result.lessons.map(l=><div className="cms-release-row" key={l.lesson_id}><div><strong>{l.title}</strong><p>Dibuka {formatAdminTimestamp(l.opened_at)}</p><p>Selesai {formatAdminTimestamp(l.completed_at)}</p></div><StatusBadge status={l.completed_at?'success':'neutral'}>{l.completed_at?'Selesai':l.opened_at?'Sedang dibaca':'Belum dibuka'}</StatusBadge></div>):<p>Belum ada aktivitas materi.</p>}</section>}
  {tab==='measurements'&&<section className="cms-panel cms-editor-body"><h2>Pengukuran IMT</h2>{result.measurements.length?result.measurements.map(m=><div className="cms-release-row" key={m.id}><div><strong>IMT {m.bmi_display}</strong><p>{m.weight_kg} kg · {m.height_cm} cm</p></div><time className="cms-date">{formatAdminTimestamp(m.created_at)}</time></div>):<p>Belum ada pengukuran.</p>}</section>}</>}</>;
 }
