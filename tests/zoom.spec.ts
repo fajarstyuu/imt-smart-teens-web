@@ -9,7 +9,7 @@ import {mkdirSync,mkdtempSync,rmSync,writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {resolve,join} from 'node:path';
 const origin=process.env.E2E_ORIGIN||'http://127.0.0.1:5173';
-const evidence=resolve('test-results/zoom-evidence');
+const evidence=resolve(process.env.E2E_ZOOM_EVIDENCE_DIR||'/home/ubuntu/imt-smart-teens/evidence/lesson-quiz/browser-zoom');
 async function data(context:BrowserContext,path:string){const r=await context.request.get(origin+'/api/v1'+path);expect(r.status(),`GET ${path}`).toBe(200);return (await r.json()).data;}
 async function reachable(page:Page,control:Locator){
  await control.scrollIntoViewIfNeeded();await control.focus();await expect(control).toBeFocused();
@@ -25,7 +25,7 @@ test('native 200 percent zoom keeps student editor report and error dialog usabl
  const profile=mkdtempSync(join(process.env.TMPDIR||tmpdir(),'imt-zoom-'));
  const extension=resolve('tests/support/browser-zoom-extension');
  const context=await chromium.launchPersistentContext(profile,{channel:'chromium',executablePath:process.env.RG_CHROME_PATH||undefined,headless:true,viewport:null,baseURL:origin,args:['--window-size=1440,1000',`--disable-extensions-except=${extension}`,`--load-extension=${extension}`]}).catch(error=>{rmSync(profile,{recursive:true,force:true});throw error;});
- const page=context.pages()[0]??await context.newPage();const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
+ const page=context.pages()[0]??await context.newPage();const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));page.on('console',message=>{const favicon=message.location().url===origin+'/favicon.ico'&&message.text().includes('404');if(favicon){console.log('Baseline development-only favicon404 observed (no API failure)');return;}if(message.type()==='error'&&!message.text().includes('401')&&!message.text().includes('403')&&!message.text().includes('409'))errors.push(message.text());});page.on('response',response=>{if(response.status()===429||response.status()>=500)errors.push(`Unexpected HTTP ${response.status()} at ${new URL(response.url()).pathname}`);});page.on('request',request=>{if(request.headers().authorization)errors.push('Unexpected Authorization header on browser request');});
  const worker=context.serviceWorkers()[0]??await context.waitForEvent('serviceworker');
  // This worker has one app tab. No tabs/host/debugger permission is requested.
  const zoom=async(factor?:number)=>worker.evaluate(async(factor)=>{
@@ -53,7 +53,7 @@ test('native 200 percent zoom keeps student editor report and error dialog usabl
  try{
   if(!process.env.E2E_PRIVATE_ENV)throw Error('Private synthetic environment required');process.loadEnvFile(process.env.E2E_PRIVATE_ENV);
   const csrf=await data(context,'/csrf');const login=await context.request.post(origin+'/api/v1/admin/sessions',{headers:{Origin:origin,'X-CSRF-Token':csrf.token},data:{email:process.env.ADMIN_EMAIL,password:process.env.ADMIN_PASSWORD}});expect(login.status()).toBe(201);
-  const school=(await data(context,'/schools?q='+encodeURIComponent('Synthetic frontend integration school')))[0];expect(school).toBeTruthy();
+  const school=(await data(context,'/schools?limit=25&offset=0'))[0];expect(school).toBeTruthy();
   const name='Siswa sintetis zoom '+Date.now().toString(36);
   await page.goto('/');await page.getByLabel('Nama lengkap',{exact:false}).fill(name);await page.getByLabel('Cari sekolah aktif').fill(school.name);await expect(page.getByRole('option',{name:school.name,exact:true})).toBeAttached();await page.getByLabel('Asal sekolah',{exact:false}).selectOption(school.id);await page.getByLabel('Tanggal pengisian',{exact:false}).fill('2026-11-16');await button(page,'Mulai pre-test').click();await expect(page.getByRole('heading',{name:'Pre-test',exact:true})).toBeVisible();
   const baseline={zoom:await zoom(),...await metrics()};expect(baseline.zoom.factor).toBe(1);
@@ -63,7 +63,7 @@ test('native 200 percent zoom keeps student editor report and error dialog usabl
   await reachable(page,page.locator('.answer-option input').first());await page.keyboard.press('Space');await expect(page.locator('.save-status')).toContainText('Jawaban tersimpan');
   await reachable(page,button(page,'Berikutnya'));await page.keyboard.press('Enter');await expect(page.getByRole('heading',{name:'Pre-test',exact:true})).toBeVisible();await capture('student-200');await capture('student-actions-200','bottom');
   // Real CMS editor, including scroll-to-field and keyboard-save at native zoom.
-  await page.goto('/admin/materi/baru');await zoom(2);const title=page.getByLabel('Judul materi',{exact:false});await reachable(page,title);await title.fill('Materi sintetis zoom '+Date.now().toString(36));const body=page.getByLabel('Isi materi',{exact:true});await reachable(page,body);await body.fill('Teks materi sintetis untuk pemeriksaan zoom browser dua ratus persen.');
+  await page.goto('/admin/materi/baru');await zoom(2);const title=page.getByLabel('Judul materi',{exact:false});await reachable(page,title);await title.fill('Materi sintetis zoom '+Date.now().toString(36));const body=page.getByLabel('Isi materi',{exact:true});await reachable(page,body);await body.fill('Teks materi sintetis untuk pemeriksaan zoom browser dua ratus persen.');await page.getByLabel('Pertanyaan kuis',{exact:true}).fill('Pertanyaan zoom yang dapat diterbitkan');await page.getByLabel('Pilihan kuis A',{exact:true}).fill('Pilihan A zoom');await page.getByLabel('Pilihan kuis B',{exact:true}).fill('Pilihan B zoom');await page.getByLabel('Kunci jawaban pilihan B',{exact:true}).check();
   await reachable(page,button(page,'Simpan draf'));await page.keyboard.press('Enter');await expect(page).toHaveURL(/\/admin\/materi\/[a-f\d-]{36}$/);const lessonId=new URL(page.url()).pathname.split('/').pop()!;await capture('editor-200');await reachable(page,page.getByLabel('Judul materi',{exact:false}));await capture('editor-fields-200','current');await capture('editor-actions-200','bottom');
   // Real scoped report + stored answer detail (not a fabricated table).
   await page.goto('/admin/hasil?school_id='+school.id);await zoom(2);const details=button(page,'Lihat hasil '+name);await reachable(page,details);await page.keyboard.press('Enter');await reachable(page,button(page,'Lihat jawaban Pre-test'));await page.keyboard.press('Enter');await expect(page.locator('.student-answers')).toContainText('Pilihan pertama sintetis');await capture('report-200');await capture('report-answers-200','bottom');
