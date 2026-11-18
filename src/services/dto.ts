@@ -1,12 +1,15 @@
 /** Explicit Rust v1 wire DTOs. Editor keys never enter student projections. */
 export type AssessmentKind='pre_test'|'quiz'|'post_test';
-export type JourneyStage=AssessmentKind|'lessons'|'calculator'|'completed';
+export type JourneyStage='pre_test'|'lessons'|'calculator'|'post_test'|'completed';
+export interface LessonQuizView {lesson_id:string;lesson_version_id:string;question:{id:string;text:string};options:{id:string;text:string}[];first_answer_option_id:string|null;attempt_count:number;revision:number;mastered:boolean}
+export interface LessonQuizAnswerResult {lesson_id:string;lesson_version_id:string;selected_option_id:string;correct:boolean;feedback:string|null;first_answer_option_id:string;attempt_count:number;revision:number;mastered:boolean;progress:Progress}
+
 export interface Profile {student:{id:string;name:string};enrollment:Enrollment}
 export interface Enrollment {id:string;school_id:string;school_name_at_enrollment:string;form_date:string;path_version_id:string;created_at:string;completed_at:string|null}
 export interface Admin {id:string;name:string;email:string;can_manage_schools:boolean;can_manage_content:boolean;school_ids:string[]}
 export interface PublicSchool {id:string;name:string}
 export interface School extends PublicSchool {status:'active'|'archived';revision:number;created_at:string;updated_at:string;archived_at:string|null}
-export interface LessonMeta {lesson_id:string;lesson_version_id:string;title:string;position:number;opened_at:string|null;completed_at:string|null}
+export interface LessonMeta {lesson_id:string;lesson_version_id:string;title:string;position:number;opened_at:string|null;reading_completed_at:string|null;completed_at:string|null}
 export interface Progress {enrollment_id:string;path_version_id:string;current_stage:JourneyStage;stages:{id:JourneyStage;status:'locked'|'in_progress'|'completed';locked_reason:string|null}[];lessons:(LessonMeta&{status:'locked'|'not_started'|'in_progress'|'completed'})[];active_attempt_ids:Partial<Record<AssessmentKind,string>>;latest_measurement_id:string|null}
 export interface LessonBody extends LessonMeta {description:string;sections:{id:string;title:string;body:string;required:boolean;position:number}[];visited_section_ids:string[]}
 export interface SavedAnswer {snapshot_question_id:string;option_ids:string[];revision:number;saved_at:string|null}

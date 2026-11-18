@@ -15,7 +15,8 @@ import { TeacherResultsPage } from './pages/TeacherResultsPage';
 import { TeacherLessonsPage, TeacherQuestionsPage } from './pages/TeacherContentPages';
 import {TeacherPublicationPage} from './pages/TeacherPublicationPage';
 import { Brand, Button, ErrorState, LoadingState } from './components/ui';
-import { currentStage, lessonUnlocked, stageUnlocked, stageComplete } from './domain/learning';
+import { LessonQuizPage } from './pages/LessonQuizPage';
+import { currentStage, lessonUnlocked, stageComplete, stageUnlocked, stages } from './domain/learning';
 import type { StageId } from './domain/types';
 
 /** Renders a prerequisite message without mounting the protected page content. */
@@ -34,7 +35,7 @@ function LegacyHashRedirect() {
 
 function LegacyAdminRedirect(){const location=useLocation();const suffix=location.pathname.slice('/guru'.length);const target=suffix.startsWith('/soal/')?'/admin/soal':`/admin${suffix||'/hasil'}`;return <Navigate replace to={`${target}${location.search}`}/>;}
 
-type StudentPage = 'home' | 'pre' | 'lesson-list' | 'lesson' | 'quiz' | 'calculator' | 'post' | 'summary';
+type StudentPage = 'home' | 'pre' | 'lesson-list' | 'lesson' | 'lesson-quiz' | 'calculator' | 'post' | 'summary';
 
 /** Enforces identity, assessment, lesson and stage access at the route boundary. */
 function StudentRoute({ page }: { page: StudentPage }) {
@@ -49,19 +50,17 @@ function StudentRoute({ page }: { page: StudentPage }) {
     return <StudentShell path={path} navigate={navigate}><LockedView navigate={navigate}/></StudentShell>;
   }
 
-  const stage: StageId | null = page === 'lesson' || page === 'lesson-list' ? 'lessons'
-    : page === 'quiz' ? 'quiz'
-      : page === 'calculator' ? 'calculator'
-        : page === 'post' ? 'post' : null;
+  const stage: StageId | null = page === 'lesson' || page === 'lesson-list' || page === 'lesson-quiz' ? 'lessons'
+    : page === 'calculator' ? 'calculator'
+      : page === 'post' ? 'post' : null;
   const locked = (stage !== null && !stageUnlocked(student, stage))
-    || (page === 'lesson' && !!lessonId && !lessonUnlocked(student, lessonId))
+    || ((page === 'lesson' || page === 'lesson-quiz') && !!lessonId && !lessonUnlocked(student, lessonId))
     || (page === 'summary' && !stageComplete(student,'post'));
 
   if (locked) return <StudentShell path={path} navigate={navigate}><LockedView navigate={navigate}/></StudentShell>;
 
   const content = page === 'pre' ? <AssessmentPage key="pre" type="pre" navigate={navigate}/>
-    : page === 'quiz' ? <AssessmentPage key="quiz" type="quiz" navigate={navigate}/>
-      : page === 'post' ? <AssessmentPage key="post" type="post" navigate={navigate}/>
+    : page === 'post' ? <AssessmentPage key="post" type="post" navigate={navigate}/>
         : page === 'calculator' ? <CalculatorPage navigate={navigate}/>
           : page === 'summary' ? <SummaryPage navigate={navigate}/>
             : page === 'lesson' && lessonId ? <LessonDetail key={lessonId} id={lessonId} navigate={navigate}/>

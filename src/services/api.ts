@@ -1,7 +1,7 @@
 /** Real Rust adapter; owns role restoration and composes only the current student's public data. */
 import type {AppServices} from './contracts';
 import type {Student,AssessmentType} from '../domain/types';
-import type {Admin,Profile,Progress,AttemptDto,LessonBody,MeasurementDto,SavedAnswer} from './dto';
+import type {Admin,Profile,Progress,AttemptDto,LessonBody,MeasurementDto,SavedAnswer,LessonQuizView,LessonQuizAnswerResult} from './dto';
 import {http,ApiError,query} from './http';
 import {EnrollmentOperation} from './enrollment';
 import {OperationKeys} from './operations';
@@ -19,7 +19,7 @@ async function compose(profile?:Profile):Promise<Student>{
  // profile with another enrollment's progress or release its recovery journal.
  if(p.enrollment_id!==me.enrollment.id||p.path_version_id!==me.enrollment.path_version_id)throw new ApiError('Sesi siswa berubah. Pulihkan ulang data sesi tersimpan.',409,'SESSION_CHANGED');
  const attempts:Student['attempts']={};
- for(const type of ['pre','quiz','post'] as const){const id=p.active_attempt_ids[kind[type]]??(current?.enrollmentId===me.enrollment.id?current.attempts[type]?.id:undefined);if(id)attempts[type]=attemptModel(await http.get<AttemptDto>(`/student/attempts/${id}`),type);}
+ for(const type of ['pre','post'] as const){const id=p.active_attempt_ids[kind[type]]??(current?.enrollmentId===me.enrollment.id?current.attempts[type]?.id:undefined);if(id)attempts[type]=attemptModel(await http.get<AttemptDto>(`/student/attempts/${id}`),type);}
  const measurements=p.latest_measurement_id?(await http.page<MeasurementDto>('/student/measurements?limit=25&offset=0')).data:[];
  const verified=await http.get<Profile>('/student/me');
  if(verified.student.id!==me.student.id||verified.enrollment.id!==me.enrollment.id)throw new ApiError('Sesi siswa berubah. Pulihkan ulang data sesi tersimpan.',409,'SESSION_CHANGED');
@@ -69,6 +69,8 @@ export const api:AppServices={
   async loadLesson(id){const detail=await http.get<LessonBody>(`/student/lessons/${id}`);const s=need();s.lessons=s.lessons.map(l=>l.id===id?{...l,description:detail.description,sections:detail.sections,visited:detail.visited_section_ids}:l);return {...s};},
   async visitLesson(id,sectionId){const result=await http.send<{visited_section_ids:string[];opened_at:string}>(`/student/lessons/${id}/opened`,'POST',sectionId?{section_id:sectionId}:{});const s=need();s.lessons=s.lessons.map(l=>l.id===id?{...l,visited:result.visited_section_ids,openedAt:result.opened_at}:l);return {...s};},
   async completeLesson(id){await http.send(`/student/lessons/${id}/completion`,'POST',{});return compose();},
+  lessonQuiz:id=>http.get<LessonQuizView>(`/student/lessons/${id}/quiz`),
+  async answerLessonQuiz(id,optionId,revision){const s=need(),payload={option_id:optionId,expected_revision:revision};return operations.run(`${s.enrollmentId}:lesson-quiz:${id}:${revision}`,payload,key=>http.send<LessonQuizAnswerResult>(`/student/lessons/${id}/quiz/answers`,'POST',payload,key));},
   async recordMeasurement(weight,height){const s=need(),payload={weight_kg:weight,height_cm:height};return operations.run(`${s.enrollmentId}:measurement`,payload,async key=>{await http.send('/student/measurements','POST',payload,key);return compose();});},
   schools:(q,offset=0)=>http.page('/schools'+query({q,limit:25,offset})),
   pendingEnrollment:()=>enrollment.pending(),enrollmentBlocked:()=>enrollment.isBlocked()

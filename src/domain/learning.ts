@@ -1,9 +1,9 @@
 import type { Student, StageId } from './types';
 export const stages: { id: StageId; label: string; path: string }[] = [
-  { id: 'pre', label: 'Pre-test', path: '/pre-test' }, { id: 'lessons', label: 'Materi', path: '/materi' }, { id: 'quiz', label: 'Quiz', path: '/quiz' }, { id: 'calculator', label: 'Kalkulator IMT', path: '/kalkulator' }, { id: 'post', label: 'Post-test', path: '/post-test' }
+  { id: 'pre', label: 'Pre-test', path: '/pre-test' }, { id: 'lessons', label: 'Materi', path: '/materi' }, { id: 'calculator', label: 'Kalkulator IMT', path: '/kalkulator' }, { id: 'post', label: 'Post-test', path: '/post-test' }
 ];
 // Stage/lock policy belongs to Rust. Presentation only maps its explicit statuses.
-const wireStage={pre:'pre_test',lessons:'lessons',quiz:'quiz',calculator:'calculator',post:'post_test'} as const;
+const wireStage={pre:'pre_test',lessons:'lessons',calculator:'calculator',post:'post_test'} as const;
 export const stageComplete=(s:Student,id:StageId)=>s.serverProgress.stages.find(x=>x.id===wireStage[id])?.status==='completed';
 export const stageUnlocked=(s:Student,id:StageId)=>{const status=s.serverProgress.stages.find(x=>x.id===wireStage[id])?.status;return !!status&&status!=='locked';};
 export const currentStage=(s:Student)=>stages.find(x=>wireStage[x.id]===s.serverProgress.current_stage)||stages[stages.length-1];

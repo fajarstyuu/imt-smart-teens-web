@@ -1,7 +1,7 @@
 /** Presentation models retain the existing Editorial Campus components; wire DTOs live in services/dto. */
 import type { Admin, Progress } from '../services/dto';
 export type AssessmentType='pre'|'quiz'|'post';
-export type StageId='pre'|'lessons'|'quiz'|'calculator'|'post';
+export type StageId='pre'|'lessons'|'calculator'|'post';
 export interface Identity {name:string;school:string;date:string}
 export interface Option {id:string;text:string}
 export interface Question {id:string;text:string;type:'single'|'multiple';required?:boolean;options:Option[];questionVersionId?:string}
