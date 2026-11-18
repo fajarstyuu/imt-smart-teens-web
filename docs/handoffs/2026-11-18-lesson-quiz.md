@@ -1,4 +1,56 @@
-# Lesson-linked quiz implementation
+# Lesson-linked quiz implementation — local acceptance complete
+
+- Date (Asia/Jakarta): 2026-11-19; parent acceptance after 00:24 WIB.
+- Status: completed for authorized LOCAL source implementation and verification. NOT merged, pushed, deployed, or initialized in production.
+- Parent final review status: accepted with two explicitly deferred minors, after one independent whole-feature review (`deleg_220c1534` / `sa-0-af7f5240`, original verdict With fixes) and parent-verified I1/I2/I3/I4 correction evidence. No second independent post-fix approval is claimed.
+- Accepted application snapshots: BE `6e19fa1c8807f74cfa4ae8a0da8546d56919fd72`; FE corrective commit `140c6c4be85d75fbf6e5501915b74f9aab7b653e`. Later branch heads may contain only this acceptance documentation.
+- Implementor continuity: SAME Luna CLI session `20261118_154509_65bc3c`; requested gpt-6-luna/openai-codex/reasoning high. Parent Sol owns integration and final acceptance. Requested settings are not independent effort telemetry. Native review inherited parent routing with no configured override; completion notification did not independently report a model identifier.
+- Canonical rules remain `/home/ubuntu/imt-smart-teens/rules/AGENTS.md` and docs/{rules,backend,frontend,delegation,handoff}.md; the original task specs/plans and chronological records below are retained.
+
+## Verified behavior and corrections
+
+- Unchanged paired pre/post types and publication snapshot flow; each lesson has exactly one immutable single-choice A/B question and one key. Student payload omits keys.
+- Wrong selection remains on the quiz, with exact red text `jawablah dengan benar untuk melanjutkan materi selanjutnya`, retry count and persisted first answer. Server rejects next-lesson/direct body access and measurement writes until the required mastery; final mastery opens calculator then post-test/summary.
+- Admin first answer/count/mastery remains only on scoped student enrollment detail, not extra main-table quiz-history columns. Republish does not replace enrolled historical question/options/order.
+- I1 fixed: quiz-owned unsent/pending/uncertain navigation guard, canceled Home/Back exact URL+history index/logout, explicit discard and committed-outcome recovery. RED `review-fix-I1-unit-red-2.log` (3expected failures) → GREEN `review-fix-I1-unit-green-2.log`; final real browser covers the cases against Rust.
+- I2 fixed: every confirmed mastery reconciles same-enrollment route progress; manual recovery retries projection, and late refresh cannot restore/overwrite logout/unmounted/changed enrollment. RED `review-fix-I2-unit-red-2.log` (6expected failures) → GREEN `review-fix-I2-unit-green-4.log`; production typing RED was independently caught by parent and corrected without widening Bootstrap. Final browser proves actual correct commit + corrupted ack + failed progress response + manual retry reaches the next lesson with no duplicated answer.
+- I3 fixed: coherent shared runner origin/port, default5173/API4180, explicit canonical settings/aliases/conflict validation, preserved HTTPS API proxy targets and pre-initialization private env loading. RED `review-fix-I3-unit-red.log` plus HTTPS/env-loading RED logs →9test GREEN `review-fix-I3-final-green.log`. Dynamic-port startup checks prove frontend readiness only; actual backend integration is the owned QA browser run.
+- I4 fixed (reviewer M1 regraded Important): removed misleading permanently locked standalone Quiz menu/score/guidance; retained lesson quizzes, legacy redirect and paired pre/post score cards. RED `review-fix-I4-unit-red-3.log` (3expected failures) → GREEN `review-fix-I4-unit-green-3.log`.
+- Stateful test harness corrected without production changes/reset: derive actual current order; assert exact two-member identity, browser-triggered PUT200 swap and exact restoration with API read-back. Await real CMS save responses; keep real limiter windows (journey timeout300s). Exactly two deliberately injected503 responses are asserted by count AND exact quiz/progress path; every other console/page error remains fatal.
+
+## Final actual verification evidence
+
+All evidence paths below are under `/home/ubuntu/imt-smart-teens/evidence/lesson-quiz/`.
+
+- Parent fresh `npm test` → exit0,92Vitest tests across25files +6legacy tests,0failures: `parent-acceptance-final-tests.log`.
+- Parent fresh `npm run build` → exit0: `parent-acceptance-final-build.log`. Existing React Router `use client` bundler warnings are retained, not represented as absent. Only the verified build-generated root index was restored before the source checkpoint.
+- Actual complete Rust-backed `npm run test:api` →9passed,0failed,6.0min, recorded final exit0: `review-fix-final-browser-12.log`. Final corrected-source regular screenshot set `review-fix-browser-final-5/` contains37PNG.
+- Parent actual `npm run test:e2e:zoom` →1passed,1.2min, native Chrome tabs.setZoom/getZoom factor2/layout720/DPR2/visualScale1/reset1: `review-fix-parent-native-zoom.log`, `review-fix-parent-native-zoom/metrics.json`,8PNG, pageErrors[]. No CSS zoom/deviceScaleFactor substitution. Parent inspected actual final summary1440px and red-feedback360px screenshots, plus selected native-zoom screenshots; final desktop shows only legitimate pre/post score cards and no standalone Quiz navigation.
+- Backend application/schema source is unchanged from the reviewed6e19 snapshot. Retained reviewed-source gates remain84Rust tests across25executables,24infra tests, fmt/Clippy-Dwarnings/build in `backend-final-*.log`; these were NOT falsely described as newly rerun after the frontend correction. Parent freshly rebuilt actual correct worktree and verified Cargo compiler source + immutable artifact hash; receipt `review-fix-parent-api-build-receipt.json`, SHA256 `54dc467d6f799bc8fd2c1154a20d9d301292f2aac857ef92e78de4e9e9bc7265`, running executable matched.
+- Parent confirmed only the owned API PID1147899 matched that receipt before SIGTERM, then verified4183/5188 unbound. QA database/fixture retained; unrelated4180/5173 were not stopped/reused. Three existing production containers were read-only checked healthy with stable frontendca5cd2d5f47e/backend9299675bf846 images; no production operation performed.
+- Earlier corrected-attempt failures are retained separately; final browser12 supersedes8/9 exploratory results. The ORIGINAL pre-review early-stdout retention gap remains disclosed in `browser-attempt-dispositions.md`; no reconstructed/fabricated raw proof.
+
+## Deferred minors — user must be told
+
+- M2: main-report latest-activity timestamp omits new reading-completion/quiz-answer events and can lag during lesson work. Detail first answer/count/mastery is correct. A future fix must not add history/columns to the main table.
+- M3: ownership-checked measurement-history GET may return empty history before final mastery. No write/progression bypass found in the approved fresh-enrollment model. A future read guard must preserve legitimate history access after post-test rather than blindly reuse the write predicate.
+
+## Rulings, limits and next owner
+
+Full original finding dispositions and costs: `evidence/lesson-quiz/independent-review-and-parent-rulings.md`.
+
+- Keep one continuous same-Luna implementation stream and the owner's already-agreed behavior; do not restart discovery or invent more product questions. Cost if interpretation was wrong: a separately scoped product correction, not silent extra features.
+- Regrade obsolete global Quiz UI as Important because it falsely implies an unfinishable requirement. Cost if wrong: bounded UI/tests-only removal; no invented aggregate score or widened wire/schema removal.
+- Retain the owner-adopted executing-plans one independent whole-feature review + one TDD correction pass; parent reviews corrective diffs/tests for acceptance instead of generic independent re-review. Cost if wrong: no second independent post-fix assurance; covering tests mitigate but do not equal it.
+- Production deployment/rollback execution remains outside scope. Nullable legacy quiz references/changed completion semantics require explicit schema/old-binary compatibility qualification and a fresh release/backup/restore plan; additive migrations alone are NOT safe rollback proof. Explicit empty production CMS initialization is still a future authorized release operation, not done here.
+- No parallel old/new enrollment support after the owner's literal reset decision. Restoring an old populated snapshot would require a separate compatibility plan.
+- No exhaustive cross-browser/accessibility/load certification; only exercised Chromium/responsive/native-zoom and named regression evidence is certified. Other environments remain untested.
+- Missing original exploratory stdout cannot be reconstructed; historical reproduction beyond retained raw logs remains unproven.
+- Next owner: user/parent chooses a separately authorized merge/push/deployment scope. No release permission is inferred from “Verifikasi gas”. Preserve QA data/private fixture (no secrets in this record), live admin account, runtime/TLS/portfolio and all prior evidence.
+
+## Historical pre-acceptance record (all pending/active language below is superseded above)
+
+### Original implementation record
 
 - Date (Asia/Jakarta): 2026-11-18
 - Status: in_progress; one independent whole-feature review completed with changes_requested. Parent verified I1/I2/I3, regraded M1 as Important I4 (misleading nonexistent quiz requirement), and transfers ONE tested correction pass to SAME Luna session20261118_154509_65bc3c. No corrected-source acceptance or deployment is claimed.
