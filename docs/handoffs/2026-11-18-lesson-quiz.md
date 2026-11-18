@@ -13,7 +13,7 @@
 - Reset is already complete. Never replay reset-non-admin-20261118.py or restore old teaching data. Production remains empty except admin/migrations; its CMS still needs explicit safe empty initialization at a future approved deployment.
 - Ruling: retain historical inline-execution preference as one continuous implementation stream, while honoring canonical Luna implementation routing through one worker; no per-task worker/reviewer carousel. Parent Sol owns final independent whole-feature review.
 - Ruling: implementation request is an instruction to proceed with the already agreed behavior; no further product questions are needed. Technical API/storage choices are builder calls recorded in runtime-contract.md and the ledger.
-- Verification at the initial source start had not yet run; see current implementation checkpoint below for completed gates and the outstanding browser blocker.
+- Verification had not run at the initial source start; see final verification below for completed gates and the sole remaining independent review.
 - Review: pending; no feature completion or deployment claimed.
 - Parent BE root has an untracked completed-reset handoff outside this worktree; preserve it.
 
