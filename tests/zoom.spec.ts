@@ -8,7 +8,8 @@ import {test,expect,chromium,type BrowserContext,type Page,type Locator} from '@
 import {mkdirSync,mkdtempSync,rmSync,writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {resolve,join} from 'node:path';
-const origin=process.env.E2E_ORIGIN||'http://127.0.0.1:5173';
+import {resolveRunnerEnvironment} from '../scripts/playwright-env.mjs';
+const origin=resolveRunnerEnvironment().testOrigin;
 const evidence=resolve(process.env.E2E_ZOOM_EVIDENCE_DIR||'/home/ubuntu/imt-smart-teens/evidence/lesson-quiz/browser-zoom');
 async function data(context:BrowserContext,path:string){const r=await context.request.get(origin+'/api/v1'+path);expect(r.status(),`GET ${path}`).toBe(200);return (await r.json()).data;}
 async function reachable(page:Page,control:Locator){
@@ -51,7 +52,7 @@ test('native 200 percent zoom keeps student editor report and error dialog usabl
   records.push({screen:name,zoom:state,...layout,screenshotWidth:width,screenshotHeight:height});
  };
  try{
-  if(!process.env.E2E_PRIVATE_ENV)throw Error('Private synthetic environment required');process.loadEnvFile(process.env.E2E_PRIVATE_ENV);
+  if(!process.env.ADMIN_EMAIL||!process.env.ADMIN_PASSWORD)throw Error('Private synthetic environment must be loaded before Playwright starts');
   const csrf=await data(context,'/csrf');const login=await context.request.post(origin+'/api/v1/admin/sessions',{headers:{Origin:origin,'X-CSRF-Token':csrf.token},data:{email:process.env.ADMIN_EMAIL,password:process.env.ADMIN_PASSWORD}});expect(login.status()).toBe(201);
   const school=(await data(context,'/schools?limit=25&offset=0'))[0];expect(school).toBeTruthy();
   const name='Siswa sintetis zoom '+Date.now().toString(36);
