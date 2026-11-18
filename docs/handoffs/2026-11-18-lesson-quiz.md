@@ -1,7 +1,7 @@
 # Lesson-linked quiz implementation
 
 - Date (Asia/Jakarta): 2026-11-18
-- Status: in_progress
+- Status: `blocked / in_progress`, NOT `ready_for_review`; real-browser acceptance is incomplete.
 - Owner/orchestrator: parent Sol, gpt-6.1-sol; effort unknown.
 - Implementation routing: one standalone Hermes invocation using gpt-6-luna, provider openai-codex, reasoning high. Routing probe session 20261118_153849_31e52e returned ROUTING_OK with exit 0. No Codex CLI is installed; do not claim Codex delegation.
 - Authorization: owner said “Implementasi” after the agreed material/quiz/retry/detail-only behavior and the completed literal non-admin DB reset. This is source implementation, not merge/push/deploy authorization.
@@ -12,23 +12,22 @@
 - Reset is already complete. Never replay reset-non-admin-20261118.py or restore old teaching data. Production remains empty except admin/migrations; its CMS still needs explicit safe empty initialization at a future approved deployment.
 - Ruling: retain historical inline-execution preference as one continuous implementation stream, while honoring canonical Luna implementation routing through one worker; no per-task worker/reviewer carousel. Parent Sol owns final independent whole-feature review.
 - Ruling: implementation request is an instruction to proceed with the already agreed behavior; no further product questions are needed. Technical API/storage choices are builder calls recorded in runtime-contract.md and the ledger.
-- Verification: not yet run for this feature. Worker must record baselines and RED→GREEN before claiming implementation.
+- Verification at the initial source start had not yet run; see current implementation checkpoint below for completed gates and the outstanding browser blocker.
 - Review: pending; no feature completion or deployment claimed.
 - Parent BE root has an untracked completed-reset handoff outside this worktree; preserve it.
 
-## Luna implementation checkpoint — 2026-11-18
+## Historical Luna implementation checkpoint — superseded by the current checkpoint below
 
-- FE implementation has not started; worktree remains unmodified at `c2275c8c3051504a9a22f6f43e4392df14c57cb5`.
+- Historical at that checkpoint: FE implementation had not started; the current implementation checkpoint below supersedes it.
 - Baseline `npm test`: legacy domain tests 6/6 and Vitest 63/63 across 21 files passed.
 - Baseline `npm run build`: passed; existing React Router module-level `use client` bundling warnings observed.
-- FE must wait for the backend's actual lesson-quiz read/answer/report DTOs and the retirement of the global quiz journey; no mock or local-only access protection is authorized.
-- Current shared worker status: implementation remains `in_progress`; lesson editor contract/bootstrap are being built in the API worktree. No FE commits or external services started.
-- Next: after Task 2 freezes backend student/detail DTOs in the API `docs/runtime-contract.md`, update this branch with the real embedded editor, per-lesson student quiz/retry screen, detail-only report and responsive/accessibility tests.
+- Historical requirement: frontend work waited for the backend's actual DTOs and global quiz retirement; this contract was subsequently frozen in the API runtime contract.
+- Historical status and next step at that checkpoint; see current implementation checkpoint below.
 
-## Parent recovery checkpoint after iteration ceiling
+## Current implementation checkpoint — 2026-11-18
 
-The first actual Luna CLI session `20261118_154509_65bc3c` exited1 after its300-iteration ceiling (runtime1h11m13s), not provider quota exhaustion. No worker remains active at this transfer. The feature is explicitly incomplete and not review-ready. Parent inspected both git statuses/diffs and the final worker summary; no production/shared services were started or changed. `git diff --check` passed in both owned worktrees.
-
-The accepted first backend content/bootstrap checkpoint is `fb550892246092dd3692878cc84d6d7bfdcbc45d`. Since that checkpoint, backend mastery/reading/event history, nullable legacy global bank/publication removal, DTO/cache/routes and detail projections exist but have not passed a complete fresh final suite. Preserve them. Two additional forward migrations and PostgreSQL workflow tests are present. Partial frontend includes stage/type/DTO/service changes, route edits and `LessonQuizPage.tsx`; it is not fully wired or GREEN, has no embedded editor/detail report yet, and no actual-browser acceptance.
-
-Parent is preserving the current partial source in local WIP commits before resuming the SAME Luna session, with unchanged ownership and product requirements. WIP is not a passing test or acceptance claim. Do not regenerate source, recreate environments, replay reset or count the old checkpoint gates as final-feature verification. Next: finish backend test gaps and final DTOs, complete and test frontend, run full real-backend browser/responsive/zoom gates, update handoffs and return for one independent whole-feature Sol review. Runtime quota percentage remains unknown.
+- Worktree `/home/ubuntu/imt-smart-teens/web/.worktrees/lesson-quiz`, branch `feat/lesson-quiz`, clean source WIP commit `9a7ddbb4477239e7e5eb96cb471801e633f3a6bf` (`wip: complete lesson quiz student and CMS UI`).
+- Frontend now routes students from completed reading to their lesson quiz and next lesson/calculator, redirects the old global quiz route, renders retry/reload/uncertain-acknowledgement states with server-projection reconciliation, embeds the fixed A/B quiz editor and publish validation, retains paired pre/post publishing, and shows quiz history only on the student detail page.
+- Tests cover wrong feedback after reload, clearing stale selection on mastery, stale cached wrong response not regressing a later mastered projection, retained request failure after successful reload, lost acknowledgement reconciliation and late prior-lesson reads. Full `npm test`: 23 files / 71 tests passed; `npm run build` passed (existing React Router bundler warnings only). Evidence logs are in `/home/ubuntu/imt-smart-teens/evidence/lesson-quiz/`.
+- Real Rust-backed Playwright acceptance is BLOCKED: `tests/rust.spec.ts` requires private `E2E_PRIVATE_ENV`, which was absent; the known `.env.test` foundation file does not contain admin login variables. No backend/frontend listener or browser session was started. No screenshots, responsive/keyboard/native-200%-zoom, empty-root browser publishing or admin detail browser verification are claimed.
+- Keep status blocked, not review-ready. Resume only with the approved private synthetic browser fixture; then run the full two-lesson Rust-backed flow and empty-root authoring/publication, inspect screenshots/accessibility/zoom, update the frozen heads and request the planned single independent Sol review. No production/shared service changes occurred.
