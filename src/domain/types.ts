@@ -8,7 +8,7 @@ export interface Question {id:string;text:string;type:'single'|'multiple';requir
 export interface Answer {value:string[];savedAt:string;revision:number}
 export interface Attempt {id:string;type:AssessmentType;number:number;questions:Question[];answers:Record<string,Answer>;submittedAt?:string;score?:number|null}
 export interface Section {id:string;title:string;body:string;required?:boolean}
-export interface Lesson {id:string;title:string;description:string;order:number;sections:Section[];openedAt?:string;completedAt?:string;visited:string[];versionId?:string}
+export interface Lesson {id:string;title:string;description:string;order:number;sections:Section[];openedAt?:string;readingCompletedAt?:string;completedAt?:string;visited:string[];versionId?:string}
 export interface Measurement {id:string;weight:number;height:number;bmi:number;bmiDisplay:string;createdAt:string}
 export interface Student {id:string;enrollmentId:string;identity:Identity;lessons:Lesson[];attempts:Partial<Record<AssessmentType,Attempt>>;measurement?:Measurement;measurements:Measurement[];createdAt:string;serverProgress:Progress}
 export type Teacher=Admin;

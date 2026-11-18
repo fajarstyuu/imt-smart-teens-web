@@ -16,7 +16,7 @@ import { TeacherLessonsPage, TeacherQuestionsPage } from './pages/TeacherContent
 import {TeacherPublicationPage} from './pages/TeacherPublicationPage';
 import { Brand, Button, ErrorState, LoadingState } from './components/ui';
 import { LessonQuizPage } from './pages/LessonQuizPage';
-import { currentStage, lessonUnlocked, stageComplete, stageUnlocked, stages } from './domain/learning';
+import { currentStage, lessonUnlocked, stageComplete, stageUnlocked } from './domain/learning';
 import type { StageId } from './domain/types';
 
 /** Renders a prerequisite message without mounting the protected page content. */
@@ -63,7 +63,8 @@ function StudentRoute({ page }: { page: StudentPage }) {
     : page === 'post' ? <AssessmentPage key="post" type="post" navigate={navigate}/>
         : page === 'calculator' ? <CalculatorPage navigate={navigate}/>
           : page === 'summary' ? <SummaryPage navigate={navigate}/>
-            : page === 'lesson' && lessonId ? <LessonDetail key={lessonId} id={lessonId} navigate={navigate}/>
+            : page === 'lesson-quiz' && lessonId ? <LessonQuizPage key={lessonId} id={lessonId} navigate={navigate}/>
+              : page === 'lesson' && lessonId ? <LessonDetail key={lessonId} id={lessonId} navigate={navigate}/>
               : <LearningHome navigate={navigate}/>;
   return <StudentShell path={['home', 'lesson-list'].includes(page) ? '/beranda' : path} navigate={navigate}>{content}</StudentShell>;
 }
@@ -119,7 +120,8 @@ export default function App() {
       <Route path="/pre-test" element={<StudentRoute page="pre"/>}/>
       <Route path="/materi" element={<StudentRoute page="lesson-list"/>}/>
       <Route path="/materi/:lessonId" element={<StudentRoute page="lesson"/>}/>
-      <Route path="/quiz" element={<StudentRoute page="quiz"/>}/>
+      <Route path="/materi/:lessonId/quiz" element={<StudentRoute page="lesson-quiz"/>}/>
+      <Route path="/quiz" element={<Navigate to="/materi" replace/>}/>
       <Route path="/kalkulator" element={<StudentRoute page="calculator"/>}/>
       <Route path="/post-test" element={<StudentRoute page="post"/>}/>
       <Route path="/ringkasan" element={<StudentRoute page="summary"/>}/>
